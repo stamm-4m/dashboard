@@ -1,0 +1,83 @@
+2025-04-16 07:54:13,501 - INFO - Starting stamm dashboard
+2025-04-16 07:54:13,501 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 07:54:39,225 - INFO - Starting stamm dashboard
+2025-04-16 07:54:39,226 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 07:54:39,234 - INFO - Dash is running on http://0.0.0.0:8081/
+
+2025-04-16 07:54:39,391 - INFO - Starting stamm dashboard
+2025-04-16 07:54:39,392 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 07:56:43,156 - INFO - Starting stamm dashboard
+2025-04-16 07:56:43,157 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 07:56:43,167 - INFO - Dash is running on http://0.0.0.0:8081/
+
+2025-04-16 07:56:43,332 - INFO - Starting stamm dashboard
+2025-04-16 07:56:43,333 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:10:50,481 - INFO - Starting stamm dashboard
+2025-04-16 08:10:50,482 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:10:50,492 - DEBUG - Creating main layout
+2025-04-16 08:10:50,493 - INFO - Dash is running on http://0.0.0.0:8081/
+
+2025-04-16 08:10:50,650 - INFO - Starting stamm dashboard
+2025-04-16 08:10:50,650 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:10:50,654 - DEBUG - Creating main layout
+2025-04-16 08:11:11,617 - INFO - Starting stamm dashboard
+2025-04-16 08:11:11,617 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:11,621 - DEBUG - Creating main layout
+2025-04-16 08:11:31,651 - INFO - Starting stamm dashboard
+2025-04-16 08:11:31,653 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:31,662 - DEBUG - Creating main layout
+2025-04-16 08:11:31,662 - INFO - Creating sidebar
+2025-04-16 08:11:35,788 - INFO - Starting stamm dashboard
+2025-04-16 08:11:35,789 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:35,793 - DEBUG - Creating main layout
+2025-04-16 08:11:35,793 - INFO - Creating sidebar
+2025-04-16 08:11:35,794 - INFO - Dash is running on http://0.0.0.0:8081/
+
+2025-04-16 08:11:35,946 - INFO - Starting stamm dashboard
+2025-04-16 08:11:35,947 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:35,950 - DEBUG - Creating main layout
+2025-04-16 08:11:35,951 - INFO - Creating sidebar
+2025-04-16 08:11:41,307 - INFO - Starting stamm dashboard
+2025-04-16 08:11:41,307 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:41,312 - DEBUG - Creating main layout
+2025-04-16 08:11:41,312 - INFO - Creating sidebarrr
+2025-04-16 08:11:43,619 - INFO - Starting stamm dashboard
+2025-04-16 08:11:43,620 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:11:43,624 - DEBUG - Creating main layout
+2025-04-16 08:11:43,624 - INFO - Creating sidebar
+2025-04-16 08:12:09,904 - INFO - Starting stamm dashboard
+2025-04-16 08:12:09,904 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:12:09,916 - DEBUG - Creating main layout
+2025-04-16 08:12:09,916 - INFO - Creating sidebar
+2025-04-16 08:13:32,360 - INFO - Starting stamm dashboard
+2025-04-16 08:13:32,361 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:13:32,378 - DEBUG - Creating main layout
+2025-04-16 08:13:32,378 - INFO - Creating sidebar
+2025-04-16 08:13:41,010 - INFO - Starting stamm dashboard
+2025-04-16 08:13:41,010 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:13:41,015 - DEBUG - Creating main layout
+2025-04-16 08:13:41,015 - INFO - Creating sidebar
+2025-04-16 08:13:54,756 - INFO - Starting stamm dashboard
+2025-04-16 08:13:54,756 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:13:54,761 - DEBUG - Creating main layout
+2025-04-16 08:13:54,761 - INFO - Creating sidebar
+2025-04-16 08:14:03,336 - INFO - Starting stamm dashboard
+2025-04-16 08:14:03,336 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:14:03,341 - DEBUG - Creating main layout
+2025-04-16 08:14:03,341 - INFO - Creating sidebar
+2025-04-16 08:14:05,668 - INFO - Starting stamm dashboard
+2025-04-16 08:14:05,669 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:14:05,673 - DEBUG - Creating main layout
+2025-04-16 08:14:05,673 - INFO - Creating sidebar
+2025-04-16 08:14:32,960 - INFO - Starting stamm dashboard
+2025-04-16 08:14:32,960 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:14:32,965 - DEBUG - Creating main layout
+2025-04-16 08:14:32,965 - INFO - Creating sidebar
+2025-04-16 08:15:18,047 - INFO - Starting stamm dashboard
+2025-04-16 08:15:18,047 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:15:18,055 - DEBUG - Creating main layout
+2025-04-16 08:15:18,055 - INFO - Creating sidebar
+2025-04-16 08:15:27,662 - INFO - Starting stamm dashboard
+2025-04-16 08:15:27,662 - INFO - Arguments: Namespace(config='config.yaml', port=8081, debug=True, mlrepository='/Users/koeho006/git/stamm/ml-repository')
+2025-04-16 08:15:27,666 - DEBUG - Creating main layout
+2025-04-16 08:15:27,667 - INFO - Creating sidebar

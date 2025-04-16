@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "stamm-dashboard"
+version = "0.0.1"
+description = "Soft Sensor Monitoring and Maintenance Framework for Machine Learning Models"
+authors = [
+    "David Camilo Corrales <David-Camilo.Corrales-Munoz@inrae.fr>"
+]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
+homepage = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
+documentation = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
+
+include = [
+    "stamm-dashboard/**",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "*"
+dash = "*"
+plotly = "*"
+influxdb-client = "*"
+PyYAML = "*"
+numpy = "*"
+joblib = "*"
+dash-bootstrap-components = "*"
+scikit-learn = "*"
+python-dotenv = "*"
+tensorflow = "*"
+
+[tool.poetry.scripts]
+stamm = "stamm_dashboard.app:main"
+
+[tool.poetry.group.test.dependencies]
+pytest-xdist = "^3.6.1"
+pytest = "^8.3.4"
+coverage = "^7.6.8"
+mypy = "^1.14.1"
+
+
+[tool.poetry.group.dev.dependencies]
+bump2version = "^1.0.1"
+pylint = "^3.3.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
