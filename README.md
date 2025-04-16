@@ -1,5 +1,11 @@
 # STAMM Dashboard
 
+## Direct usage
+
+```bash
+python3 -m stamm_dashboard.app
+```
+
 ## Poetry usage
 
 ### Install Poetry
