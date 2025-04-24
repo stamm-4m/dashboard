@@ -1,0 +1,12 @@
+pandas
+dash
+plotly
+influxdb-client
+PyYAML
+tensorflow
+numpy
+joblib
+dash-bootstrap-components
+datetime
+scikit-learn
+python-dotenv
