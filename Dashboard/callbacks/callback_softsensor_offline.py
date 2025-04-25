@@ -3,10 +3,10 @@ from dash import Input, Output, State, html,ALL,ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from utils import model_information
-from InfluxDb import influxdb_handler # retrieve the created instance
-from utils.utils_sofsensors_offline import reload_models_yaml, generate_predictions, generate_prediction_name # the necessary utils functions for the callbacks are loaded
-from pages.model_details_view import generate_model_details_view
+from Dashboard.utils import model_information
+from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.utils.utils_sofsensors_offline import reload_models_yaml, generate_predictions, generate_prediction_name # the necessary utils functions for the callbacks are loaded
+from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
 

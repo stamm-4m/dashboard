@@ -1,7 +1,7 @@
 from dash import html,dcc, dash_table
 import dash_bootstrap_components as dbc
-from InfluxDb import influxdb_handler
-from utils.utils_global import disabled_figure
+from Dashboard.InfluxDb import influxdb_handler
+from Dashboard.utils.utils_global import disabled_figure
 
 def data_source_layout():
         buckets_options = [{"label": b, "value": b} for b in influxdb_handler.get_buckets()]

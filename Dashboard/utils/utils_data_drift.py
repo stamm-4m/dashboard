@@ -1,5 +1,5 @@
 import numpy as np
-from Drift_detectors.univariate_drift import adwin_drift, psi_drift
+from Dashboard.Drift_detectors.univariate_drift import adwin_drift, psi_drift
 
 def get_result_metric(score, data_training, data_test):
     if score == "PSI":

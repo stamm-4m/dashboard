@@ -2,12 +2,12 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 
-from utils import model_selector
+from Dashboard.utils import model_information
 
 
 def performance_estimator_layout():
-        model_name_options = model_selector.get_model_name_options()
-        metrics_score_options = model_selector.get_performance_estimators_options()
+        model_name_options = model_information.get_model_name_options()
+        metrics_score_options = model_information.get_performance_estimators_options()
         # Initialize the figure with a default layout
         global disabled_figure 
         disabled_figure = {

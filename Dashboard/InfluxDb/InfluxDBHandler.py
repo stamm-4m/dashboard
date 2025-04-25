@@ -1,4 +1,4 @@
-from config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
+from Dashboard.config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
 from datetime import datetime, timedelta
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS

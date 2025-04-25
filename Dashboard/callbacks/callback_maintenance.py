@@ -4,9 +4,9 @@ import dash
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 import io
-from utils import model_selector
+from Dashboard.utils import model_selector
 import plotly.express as px
 
 

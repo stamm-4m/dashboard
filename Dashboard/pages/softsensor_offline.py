@@ -1,8 +1,8 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-from utils import model_selector
-from utils.utils_global import disabled_figure
+from Dashboard.utils import model_selector
+from Dashboard.utils.utils_global import disabled_figure
 
 
 

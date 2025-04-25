@@ -1,7 +1,7 @@
 import dash_bootstrap_components as dbc
 import requests
 import json
-from InfluxDb import influxdb_handler  # Retrieve the created instance
+from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 
 
 def generate_predictions(batch_id, datamodel, n):

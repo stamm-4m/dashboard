@@ -3,9 +3,9 @@ from dash import Input, Output, State, dcc, html, dash_table, MATCH
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from utils import model_information
-from InfluxDb import influxdb_handler  # Retrieve the created instance
-from utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
+from Dashboard.utils import model_information
+from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
+from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 
 @dash.callback(
     Output("store-selected-state", "data"),

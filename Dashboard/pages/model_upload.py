@@ -1,6 +1,6 @@
 from dash import dcc, html
 import dash_bootstrap_components as dbc
-from callbacks.callback_model_upload import upload_id,output_id
+from Dashboard.callbacks.callback_model_upload import upload_id,output_id
 
 
    

@@ -2,9 +2,9 @@ import yaml
 import os
 import pandas as pd
 import logging
-from config import BASE_URL_API
-from utils.utils_apiclient import ApiClient
-from Drift_detectors.metadata_utils import get_algorithm_info,load_algorithm_metadata
+from Dashboard.config import BASE_URL_API
+from Dashboard.utils.utils_apiclient import ApiClient
+from Dashboard.Drift_detectors.metadata_utils import get_algorithm_info,load_algorithm_metadata
 
 
 

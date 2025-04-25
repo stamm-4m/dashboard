@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "stamm-dashboard"
+name = "Dashboard"
 version = "0.0.1"
 description = "Soft Sensor Monitoring and Maintenance Framework for Machine Learning Models"
 authors = [
@@ -12,13 +12,13 @@ homepage = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-
 documentation = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
 
 include = [
-    "stamm-dashboard/**",
+    "Dashboard/**",
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.9.0,<3.11"
 pandas = "*"
-dash = "*"
+dash = "^3.0"
 plotly = "*"
 influxdb-client = "*"
 PyYAML = "*"
@@ -27,21 +27,23 @@ joblib = "*"
 dash-bootstrap-components = "*"
 scikit-learn = "*"
 python-dotenv = "*"
-tensorflow = "*"
+tensorflow = "2.14.0"
+typing-extensions = "^4.13.2"
 
 [tool.poetry.scripts]
-stamm = "stamm_dashboard.app:main"
+stamm = "Dashboard.app:main"
 
 [tool.poetry.group.test.dependencies]
 pytest-xdist = "^3.6.1"
 pytest = "^8.3.4"
 coverage = "^7.6.8"
-mypy = "^1.14.1"
+mypy = "0.991"
 
 
 [tool.poetry.group.dev.dependencies]
 bump2version = "^1.0.1"
 pylint = "^3.3.4"
+
 
 [build-system]
 requires = ["poetry-core"]

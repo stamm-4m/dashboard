@@ -7,10 +7,10 @@ import pandas as pd
 import numpy as np
 import re
 
-from InfluxDb import influxdb_handler
-from utils import model_selector
-from utils.utils_performance_estimator import calculate_cossim,calculate_cv,calculate_mae,calculate_mse,calculate_pcc,calculate_rmse,calculate_vpd,get_next_color,generate_prediction_name
-from utils.utils_global import disabled_figure
+from Dashboard.InfluxDb import influxdb_handler
+from Dashboard.utils import model_selector
+from Dashboard.utils.utils_performance_estimator import calculate_cossim,calculate_cv,calculate_mae,calculate_mse,calculate_pcc,calculate_rmse,calculate_vpd,get_next_color,generate_prediction_name
+from Dashboard.utils.utils_global import disabled_figure
 
 
 @dash.callback(

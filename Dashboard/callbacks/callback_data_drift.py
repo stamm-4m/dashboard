@@ -5,9 +5,9 @@ import plotly.graph_objs as go
 import numpy as np
 import scipy.stats as stats
 
-from utils import model_information
-from utils.utils_data_drift import get_result_metric
-from InfluxDb import influxdb_handler  # Retrieve the created instance
+from Dashboard.utils import model_information
+from Dashboard.utils.utils_data_drift import get_result_metric
+from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 
 # Load input for each selected model
 @dash.callback(

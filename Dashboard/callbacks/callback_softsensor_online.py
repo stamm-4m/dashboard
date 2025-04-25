@@ -2,14 +2,14 @@ import dash
 from dash import Input, Output, State, html, ALL, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
-from utils import model_information
-from InfluxDb import influxdb_handler # retrieve the created instance
-from utils.utils_sofsensors_offline import reload_models_yaml
-from utils.utils_softsensors_online import create_toast, generate_predictions
-from pages.model_details_view import generate_model_details_view
+from Dashboard.utils import model_information
+from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.utils.utils_sofsensors_offline import reload_models_yaml
+from Dashboard.utils.utils_softsensors_online import create_toast, generate_predictions
+from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
-from utils.utils_global import disabled_figure
+from Dashboard.utils.utils_global import disabled_figure
 
 # Control start prediction
 inicio_pred = 0

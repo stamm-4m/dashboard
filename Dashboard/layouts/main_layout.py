@@ -1,6 +1,6 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from components.sidebar import sidebar
+from Dashboard.components.sidebar import sidebar
 
 def layout():
     return dbc.Container([
