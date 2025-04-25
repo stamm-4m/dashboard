@@ -37,6 +37,9 @@ INFLUXDB_URL=http://localhost:8086
 INFLUXDB_TOKEN=your_influxdb_token
 INFLUXDB_ORG=your_organization
 INFLUXDB_BUCKET=your_bucket_name
+INFLUXDB_BUCKET=STAMM_DATA
+BACH_ID=_measurement
+BASE_URL_API = url_ml_repository_api
 ```
 ### ▶️ Running the App
 
