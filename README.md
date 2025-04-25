@@ -28,8 +28,17 @@ which python  # macOS/Linux
 # or
 where python  # Windows
 ```
+### Setup Environment Variables
 
-### Run the app
+Create a .env file in the root directory or inside Dashboards/env/ with the following structure:
+```python
+
+INFLUXDB_URL=http://localhost:8086
+INFLUXDB_TOKEN=your_influxdb_token
+INFLUXDB_ORG=your_organization
+INFLUXDB_BUCKET=your_bucket_name
+```
+### ▶️ Running the App
 
 ```bash
 poetry run stamm -p 8081 -d
