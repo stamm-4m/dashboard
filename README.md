@@ -17,7 +17,16 @@ pip install poetry
 ### Install dependencies
 
 ```bash
-poetry install
+# Make sure Poetry is installed
+poetry install  # This will create the virtual environment and install project dependencies
+
+# Activate the virtual environment created by Poetry
+poetry shell  # This activates the Poetry virtual environment
+
+# Verify that you're in the virtual environment by running:
+which python  # macOS/Linux
+# or
+where python  # Windows
 ```
 
 ### Run the app
