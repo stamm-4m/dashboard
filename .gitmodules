@@ -1,0 +1,9 @@
+[submodule "drift-detectors"]
+	path = drift-detectors
+	url = git@gitlab.com:stamm-4m/drift-detectors.git
+[submodule "drift_detectors"]
+	path = drift_detectors
+	url = git@gitlab.com:stamm-4m/drift-detectors.git
+[submodule "multi_db_connector"]
+	path = multi_db_connector
+	url = git@gitlab.com:stamm-4m/multi-db-connector.git
