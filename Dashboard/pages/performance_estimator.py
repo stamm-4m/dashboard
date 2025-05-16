@@ -2,33 +2,14 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 
-from Dashboard.utils import model_information
+from utils import model_information
+from utils.utils_global import disabled_figure
 
 
 def performance_estimator_layout():
         model_name_options = model_information.get_model_name_options()
         metrics_score_options = model_information.get_performance_estimators_options()
         # Initialize the figure with a default layout
-        global disabled_figure 
-        disabled_figure = {
-            "data": [],
-            "layout": go.Layout(
-                xaxis={"title": "X Axis", "visible": False},
-                yaxis={"title": "Y Axis", "visible": False},
-                annotations=[
-                    {
-                        "text": "Graph Disabled",
-                        "xref": "paper",
-                        "yref": "paper",
-                        "showarrow": False,
-                        "font": {"size": 20, "color": "gray"},
-                    }
-                ],
-                plot_bgcolor="lightgray",  # Gray background for "disabled" effect
-                paper_bgcolor="lightgray",
-            ),
-        }
-
         return html.Div([
                 html.H3("Performance estimator", className="text-center"),
 
@@ -57,7 +38,6 @@ def performance_estimator_layout():
                                     id='soft-sensor-input',
                                     options=model_name_options,
                                     className='mb-2',
-                                    searchable=True,
                                     placeholder="Select soft sensors",
                                     style={'width': '100%', 'whiteSpace': 'normal'}
                                 ),

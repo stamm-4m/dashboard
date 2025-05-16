@@ -2,12 +2,12 @@ import dash_bootstrap_components as dbc
 import requests
 import json
 import re
-from Dashboard.utils import model_information
-from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
+from utils import model_information
+from InfluxDb import influxdb_handler  # Retrieve the created instance
 
 
-# Calls the function again to read YAML files from the 'Models' folder
-def reload_models_yaml():
+# Calls the function again to read  'Models
+def reload_models():
     model_information.configurations = []
     model_information.load_all_models()
 
@@ -89,18 +89,18 @@ def generate_prediction_name(model_file):
     
     if match:
         model_type = match.group(1)  # Extracts the part before .pkl
-        return f"{model_type}_penicillin_prediction"
+        return f"pred_penicillin_{model_type}"
     
     match = re.search(r'_([^_]*)\.keras$', model_file)
     
     if match:
         model_type = match.group(1)  # Extracts the part before .keras
-        return f"{model_type}_penicillin_prediction"
+        return f"pred_penicillin_{model_type}"
     
     match = re.search(r'_([^_]*)\.rds$', model_file)
     
     if match:
         model_type = match.group(1)  # Extracts the part before .rds
-        return f"{model_type}_penicillin_prediction"
+        return f"pred_penicillin_{model_type}"
     
-    return "penicillin_prediction"
+    return "penicillin_concentration"

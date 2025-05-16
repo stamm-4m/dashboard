@@ -9,8 +9,8 @@ def generate_model_details_view(config):
     model_desc = config['model_description']
     model_pack = model_desc.get('packages', [])
     model_train = config['training_information']
-    features = config['input_features']
-    predictions = config['output_features']
+    features = config['inputs'].get('features', 'N/A')
+    predictions = config['outputs'].get('predictions', 'N/A')
 
     name = model_ident.get('name', 'N/A')
     version = model_ident.get('version', 'N/A')
@@ -100,9 +100,8 @@ def generate_model_details_view(config):
                                 html.H4("Inputs"),
                                 dbc.ListGroup([
                                     dbc.ListGroupItem(html.Span([
-                                        dbc.Badge(feature, color="primary", className="me-2"),
-                                        """dbc.Badge(feature["name"], color="primary", className="me-2"),
-                                        f"{feature['description']} ({feature['units']})","""
+                                        dbc.Badge(feature["name"], color="primary", className="me-2"),
+                                        f"{feature['description']} ({feature['units']})",
                                     ])) for feature in features
                                 ], flush=True),
                             ]), width=12),
@@ -112,9 +111,8 @@ def generate_model_details_view(config):
                                 html.H4("Outputs"),
                                 dbc.ListGroup([
                                     dbc.ListGroupItem(html.Span([
-                                        dbc.Badge(prediction, color="success", className="me-2"),
-                                        """dbc.Badge(prediction["name"], color="success", className="me-2"),
-                                        f"{prediction['description']} ({prediction['units']})","""
+                                        dbc.Badge(prediction["name"], color="success", className="me-2"),
+                                        f"{prediction['description']} ({prediction['units']})",
                                     ])) for prediction in predictions
                                 ], flush=True),
                             ]), width=12),

@@ -3,9 +3,9 @@ from dash import Input, Output, State, dcc, html, dash_table, MATCH
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.utils import model_information
-from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
-from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
+from utils import model_information
+from InfluxDb import influxdb_handler  # Retrieve the created instance
+from utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 
 @dash.callback(
     Output("store-selected-state", "data"),
@@ -38,16 +38,18 @@ def sync_experiment_selection(experiment_id, store_data):
 def update_dropdowns(selected_option, selected_bucket):
     """Updates the dropdown options based on ONLINE/OFFLINE state."""
     try:
-        if selected_option == "ON":
-            bucket_options = [{"label": "STAMM_DATA", "value": "STAMM_DATA"}]
-            experiment_options = [{"label": "4.0", "value": "4.0"}]
-            return bucket_options, experiment_options
-        else:
-            bucket_options = [{"label": b, "value": b} for b in influxdb_handler.get_buckets()]
-
+        bucket_options = [{"label": b, "value": b} for b in influxdb_handler.get_buckets()]
         experiment_options = []
         if selected_bucket:
-            experiments = influxdb_handler.get_distinct_experiment_ids(selected_bucket)
+            # Solo obtener experimentos con datos en los últimos 5 minutos
+            exp_recent = influxdb_handler.get_recent_experiment_ids(selected_bucket, minutes=5)
+            # Obtener todos los experimentos sin importar la fecha
+            exp_all = influxdb_handler.get_distinct_experiment_ids(selected_bucket)
+            if selected_option == "ON":
+                experiments = exp_recent
+            else:
+                experiments = [item for item in exp_all if item not in exp_recent]
+                        
             print(experiments)
             experiment_options = [{"label": exp, "value": exp} for exp in experiments]
 

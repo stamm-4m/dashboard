@@ -1,17 +1,17 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-from Dashboard.utils import model_selector
-from Dashboard.utils.utils_global import disabled_figure
+from utils import model_information
+from utils.utils_global import disabled_figure
 
 
 
 def sofsensor_offline_layout():
-        model_name_options = model_selector.get_model_name_options()
-
+        model_name_options = model_information.get_model_name_options()
+        
         return html.Div([
             # Title
-            html.H2("Soft sensors Offline", className="text-center my-5"),
+            html.H2("Soft sensors Offline", className="text-center my-2"),
             # Card container
             dbc.Card(
                 dbc.CardBody([
@@ -42,7 +42,7 @@ def sofsensor_offline_layout():
                             dbc.Col(
                                 [
                                     dbc.Button(
-                                        "Run",
+                                        "Show simulation",
                                         id="run",
                                         n_clicks=0,
                                         color="primary",

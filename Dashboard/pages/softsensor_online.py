@@ -1,16 +1,16 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 import pandas as pd
-from Dashboard.utils import model_selector
-from Dashboard.utils.utils_global import disabled_figure
+from utils import model_information
+from utils.utils_global import disabled_figure
 
 
 def softsensor_online_layout():
-        model_name_options = model_selector.get_model_name_options()
+        model_name_options = model_information.get_model_name_options()
         
         return html.Div([
             # Title
-            html.H2("Soft sensors Online", className="text-center my-5"),
+            html.H2("Soft sensors Online", className="text-center my-2"),
             # Card container
             dbc.Card(
                 dbc.CardBody([
@@ -55,6 +55,23 @@ def softsensor_online_layout():
                             ),
                         ],
                         className="align-items-center"),
+                        # Row interval control
+                        dbc.Row(
+                            dbc.Col([
+                                html.Div(id='slider-value-output'),
+                                dcc.Slider(
+                                    id='interval-seconds-input',
+                                    min=1,
+                                    max=60,
+                                    step=1,
+                                    value=5,
+                                    marks=None,  
+                                    tooltip={"placement": "bottom", "always_visible": False}
+                                )
+                            ],
+                            className="align-items-center",  # Center vertically
+                            )
+                        ),
                         # Row for model details
                         dbc.Row(
                             dbc.Col(
@@ -170,15 +187,11 @@ def softsensor_online_layout():
                                             dcc.Graph(
                                                 id='line-chart-prediction-on',
                                                 figure=disabled_figure
-                                            ),
-                                            # Store data between updates
-                                            dcc.Store(id="prediction-data", data={"_time": [], "penicillin_concentration": [], "var1": [],"var2": [],"var3": []}),
-                                            dcc.Store(id="selected-variables", data=[{"variable_name":"penicillin_concentration"}]),
-                                            dcc.Interval(
-                                                id='interval-component',
-                                                interval=10000,  # in milliseconds
-                                                n_intervals=0
-                                            )
+                                            ),       
+                                        dcc.Interval(id='interval-component',interval=10000,n_intervals=0),   
+                                        # Store data between updates
+                                        dcc.Store(id="prediction-data", data={}),
+                                        dcc.Store(id="selected-variables", data=[]),                                  
                                         ])
                                     ])
                                 ]

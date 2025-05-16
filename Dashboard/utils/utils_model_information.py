@@ -2,9 +2,11 @@ import yaml
 import os
 import pandas as pd
 import logging
-from Dashboard.config import BASE_URL_API
-from Dashboard.utils.utils_apiclient import ApiClient
-from Dashboard.Drift_detectors.metadata_utils import get_algorithm_info,load_algorithm_metadata
+from config import BASE_URL_API
+from utils.utils_apiclient import ApiClient
+from io import StringIO
+from drift_detectors.drift_detectors.utility import  metadata
+from drift_detectors.drift_detectors.model_disagreement import DisagreementMetricLoader
 
 
 
@@ -199,14 +201,14 @@ class ModelInformation:
             data.append(row)
 
         return pd.DataFrame(data)
-    # Function to load inputs from a YAML file
-    def load_inputs_from_yaml(self, model_name):
+    # Function to load inputs from configuration
+    def load_inputs_from_configuration(self, model_name):
         config = self.get_configuration_by_model_name(model_name)
         #model_config = config.get('ml_model_configuration', {})
-        print(config)
-        inputs = config.get("input_features", [])
+        inputs = config['inputs'].get("features", [])
+        print("inputs",inputs)
         # Create options for the Dropdown
-        return [{"label": feature, "value": feature} for feature in inputs]
+        return [{"label": feature['name'], "value": feature['name']} for feature in inputs]
 
     def load_yaml_file_monitoring(self, filepath):
         """Loads a YAML file and adds it to the configurations list."""
@@ -228,46 +230,21 @@ class ModelInformation:
 
     def get_metrics_score_options(self):
         #self.load_multiple_yaml_files_monitoring("../Monitoring/data_drift_detectors")
-        self.configurations_monitoring = load_algorithm_metadata()
-        print("self.configurations_monitoring: ",self.configurations_monitoring)
-        metrics = set()  # Use a set to avoid duplicate values
-
-        for config in self.configurations_monitoring:
-            try:
-                # Extract the detector name from the configuration
-                print(config)
-                name = config
-
-                if name:  # Avoid empty or None values
-                    metrics.add(name)
-            except Exception as e:
-                logging.error(f"Error processing configuration monitoring: {e}")
+        try:
+            # Read the string into a DataFrame using pipe (|) as separator
+            df = parse_markdown_table(metadata.generate_markdown_table())
+            
+            # Access columns
+            
+            print(df["Class"].str.strip())  # Access the 'Class' column
+            
+            metrics = set(df["Class"])  # Use a set to avoid duplicate values
+        except Exception as e:
+            logging.error(f"Error processing metadata score metrics: {e}")
 
         # Convert unique values into a list of dictionaries
         return [{"label": metric, "value": metric} for metric in sorted(metrics)]
     
-    # Searches for the selected metric in the already loaded YAML files in configurations_monitoring
-    def load_metric_descriptions(self, selected_metric):
-        # Default values in case the metric is not found
-        default_response = {
-            "name": "Unknown Metric",
-            "thresholds": {"low": "N/A", "moderate": "N/A", "high": "N/A"},
-            "configuration": {}
-        }
-
-        config = self.configurations_monitoring
-        try:
-            if config.get(selected_metric, {}).get("acronym"):
-                drift_detector = config.get(selected_metric, {})
-                return {
-                    "name": drift_detector.get("name", "Unknown Metric"),
-                    "thresholds": drift_detector.get("thresholds", default_response["thresholds"]),
-                    "configuration": drift_detector.get("configuration", {})
-                }
-        except Exception as e:
-            print(f"Error retrieving metric information {selected_metric}: {e}")
-
-        return default_response
     
     # Gets all unique categories from the 'type' field within inputs.
     def get_unique_types_models(self, model_name):
@@ -275,21 +252,22 @@ class ModelInformation:
             try:
                 if model_name:
                     # Navigate through the configuration structure to find the model
-                    
                     model_config = config.get('model_description', {})
                     if model_config.get('model_name') == model_name:
-                        print(config)
+                        print("config: ",config)
                         return self.get_feature_categories(config)
                 else:
                     print("Model not found in configuration")
                     return []  # Or return an empty list []
             except Exception as e:
                 print(f"Error processing get category: {e}")
+                return [] 
+                
     
     def get_feature_categories(self, config):
         categories = set()
-        for feature in config["input_features"]:
-            feature_name = feature
+        for feature in config["inputs"].get('features', []):
+            feature_name = feature['name']
             for category, variables in self.variable_categories.items():
                 if feature_name in variables:
                     categories.add(category)
@@ -304,11 +282,11 @@ class ModelInformation:
                     if model_config.get('model_name') == model_name:
                         # Get list name in  variable_categories by category selected
                         valid_names = self.variable_categories.get(category, [])
-                        print(valid_names)
+                        print("valid_names: ",valid_names)
                         filtered_inputs = [
-                            {"label": feature, "value": feature}
-                            for feature in config["input_features"]
-                            #if feature["type"] in valid_names
+                            {"label": feature['name'], "value": feature['name']}
+                            for feature in config["inputs"].get('features', [])
+                            if feature["type"] in category
                         ]
                         return filtered_inputs
                 else:
@@ -318,23 +296,21 @@ class ModelInformation:
                 print(f"Error processing get name input: {e}")
 
     def get_performance_estimators_options(self):
-        self.load_multiple_yaml_files_monitoring("../Monitoring/performance_estimators")
         estimators = set()
-
-        for config in self.configurations_monitoring:
-            try:
-                # Extract the list of detectors from the configuration
-                drift_detectors = config.get('drift_detector', [])
+        metric_load =  DisagreementMetricLoader()
+        
+        try:
+            # Extract the list of detectors from the configuration
+            drift_detectors = metric_load.data.get('drift_detector', [])
                 
-                if isinstance(drift_detectors, list):
-                    for detector in drift_detectors:
-                        name = detector.get('name')
-                        acronym = detector.get('acronym')
-                        
-                        if name and acronym:  # Ensure both values exist
-                            estimators.add((name, acronym))
-            except Exception as e:
-                logging.error(f"Error processing configuration estimator: {e}")
+            if isinstance(drift_detectors, list):
+                for detector in drift_detectors:
+                    name = detector.get('name')
+                    acronym = detector.get('acronym')
+                    if name and acronym:  # Ensure both values exist
+                        estimators.add((name, acronym))
+        except Exception as e:
+            logging.error(f"Error processing configuration estimator: {e}")
 
         # Convert unique values into a list of dictionaries
         return [{"label": acronym, "value": acronym} for name, acronym in sorted(estimators)]
@@ -348,23 +324,23 @@ class ModelInformation:
             "implementation_notes": []
         }
 
-        for config in self.configurations_monitoring:
-            try:
-                drift_detectors = config.get('drift_detector', [])
+        metric_load =  DisagreementMetricLoader()
+        try:
+            drift_detectors = metric_load.data.get('drift_detector', [])
                 
-                if isinstance(drift_detectors, list):
-                    for detector in drift_detectors:
-                        if detector.get("acronym") == selected_estimator:
-                            return {
+            if isinstance(drift_detectors, list):
+                for detector in drift_detectors:
+                    if detector.get("acronym") == selected_estimator:
+                        return {
                                 "name": detector.get("name", "Unknown Metric"),
                                 "method": detector.get("method", {}),
                                 "configuration": detector.get("configuration", {}),
                                 "implementation_notes": detector.get("implementation_notes", [])
                             }
-            except Exception as e:
-                logging.error(f"Error retrieving metric information {selected_estimator}: {e}")
+        except Exception as e:
+            logging.error(f"Error retrieving metric information {selected_estimator}: {e}")
         
-        logging.warning(f"Metric not found: {selected_estimator}. Available data: {self.configurations_monitoring}")
+        logging.warning(f"Metric not found: {selected_estimator}. Available data: {drift_detectors}")
         return default_response
     
     def project_details(self):
@@ -376,12 +352,24 @@ class ModelInformation:
             print(f" Error get project details data: {e}")
 
     def get_information_algorith(self,score):
-
+        result = []
         if score == "PSI":
-            result = get_algorithm_info(score)
+            #result = get_algorithm_info(score)
             return result
 
         if score == "ADWIN":
-            result = get_algorithm_info(score)
+            #result = get_algorithm_info(score)
             print("ADWIN info:", result)
             return result
+        
+def parse_markdown_table(markdown_str: str) -> pd.DataFrame:
+    # Convert the markdown string to a DataFrame
+    df = pd.read_csv(StringIO(markdown_str), sep="|", engine="python", skipinitialspace=True)
+    df = df.drop(columns=[""], errors="ignore")  # Drop empty columns if any
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # Drop unnamed columns
+    
+    # Drop the separator row (row that contains only dashes)
+    df = df.drop(index=0).reset_index(drop=True)
+    df.columns = df.columns.str.strip()  # Limpia espacios
+
+    return df

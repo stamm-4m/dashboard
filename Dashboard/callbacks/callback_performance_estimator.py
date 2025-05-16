@@ -7,11 +7,20 @@ import pandas as pd
 import numpy as np
 import re
 
-from Dashboard.InfluxDb import influxdb_handler
-from Dashboard.utils import model_selector
-from Dashboard.utils.utils_performance_estimator import calculate_cossim,calculate_cv,calculate_mae,calculate_mse,calculate_pcc,calculate_rmse,calculate_vpd,get_next_color,generate_prediction_name
-from Dashboard.utils.utils_global import disabled_figure
+from InfluxDb import influxdb_handler
+from utils import model_information
+from utils.utils_performance_estimator import get_next_color,reload_models
+from utils.utils_global import disabled_figure, generate_prediction_name
+from drift_detectors.drift_detectors.model_disagreement import DisagreementMetricLoader
 
+        # Function to update the options of the existing models
+@dash.callback(
+            Output('soft-sensor-input', 'options'),
+            Input('soft-sensor-input', 'n_clicks')
+        )
+def update_model_options(n_clicks):
+    reload_models()
+    return model_information.get_model_name_options()
 
 @dash.callback(
             Output("performance-plot", "figure", allow_duplicate=True),
@@ -54,7 +63,7 @@ def update_experiment_display(data):
 def update_input_options(selected_model):
     print("value", selected_model)
     if selected_model:
-        return model_selector.load_inputs_from_yaml(selected_model)
+        return model_information.load_inputs_from_configuration(selected_model)
     return []  # If no model is selected, leave it empty
 
 # Load selected metrics
@@ -67,7 +76,7 @@ def update_estimator_section(selected_metric):
         return html.Div()  # If no metric is selected, return an empty div
 
     # Get information about the selected STIMAROE
-    metric_info = model_selector.load_estimator_descriptions(selected_metric)
+    metric_info = model_information.load_estimator_descriptions(selected_metric)
     if not metric_info:
         return html.Div(html.P("No information available for this performance estimator."))
 
@@ -159,7 +168,7 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
     # **Case 1: Add Thresholds**
     if triggered_id == "performance-estimator-dropdown" and selected_metric:
         fig = go.Figure()
-        metric_info = model_selector.load_estimator_descriptions(selected_metric)
+        metric_info = model_information.load_estimator_descriptions(selected_metric)
         if metric_info:
             # Define colors according to the threshold level
             threshold_colors = {"low": "green", "moderate": "orange", "high": "red"}
@@ -188,7 +197,7 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
                               fillcolor="orange", opacity=0.2, layer="below", line_width=0)
             # Add horizontal lines for thresholds
             for key, value in thresholds.items():
-                if key != "moderate":
+                if key != "moderate" and key != "reference":
                     threshold_value = extract_threshold_value(value)
                     if threshold_value is not None:
                         fig.add_hline(
@@ -204,9 +213,10 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
     if triggered_id == "add-performance-button" and model_selected and experiment_id["selected_experiment"] and param_values:
         fig = go.Figure(figure_data) if isinstance(figure_data, dict) else go.Figure()
 
-        name_file_model = model_selector.get_configuration_by_model_name(model_selected)['ml_model_configuration']['model_description']['config_files']['model_file']
+        name_file_model = model_information.get_configuration_by_model_name(model_selected)['model_description']['config_files']['model_file']
         name_prediction1 = generate_prediction_name(model_data_selected["model_file"])
         name_prediction2 = generate_prediction_name(name_file_model)
+        
         df_bach = influxdb_handler.get_data_by_batch_id2(experiment_id["selected_experiment"])
         n = param_values[0]
 
@@ -230,30 +240,36 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
 
             # Dictionary of pointwise metrics
             pointwise_metrics = {
-                "MAE": calculate_mae,
-                "MSE": calculate_mse,
-                "RMSE": calculate_rmse,
-                "VPD": calculate_vpd
+                "VPD"
             }
 
             # Dictionary of global metrics (return a single value)
             constant_metrics = {
-                "PCC": calculate_pcc,
-                "CosSim": calculate_cossim,
-                "CV": calculate_cv
+                "MSE",
+                "MAE",
+                "PCC",
+                "RMSE",
+                "CosSim",
+                "CV"
             }
-
+            
+            loader = DisagreementMetricLoader()
+            metric = loader.get_metric(selected_metric)
+            value = metric.compute(y_true,y_pred)
             if selected_metric in pointwise_metrics:
-                metric_values = pointwise_metrics[selected_metric](y_true, y_pred)
+                # nothing
+                metric_values = value
+                print("metric selected compute value is pointwise")
             elif selected_metric in constant_metrics:
-                metric_value = constant_metrics[selected_metric](y_true, y_pred)
-                metric_values = [metric_value] * len(y_true)  # Repeat across all points
+                print("metric selected compute value is constant")
+                metric_values = [value] * len(y_true)  # Repeat across all points
             else:
                 print(f"❌ Metric '{selected_metric}' not supported.")
                 return fig
-
-            # Handle NaN values (for PCC and CosSim) by replacing them with zeros
-            metric_values = np.nan_to_num(metric_values)
+            
+            
+            
+            print(f"{metric.name} ({metric.acronym}): {value:.4f}")
 
             # Remove previous traces of the same metric to avoid accumulation
             fig.data = [trace for trace in fig.data if trace.name != f"{selected_metric} {name_prediction2}"]

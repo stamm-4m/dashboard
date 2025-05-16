@@ -189,30 +189,6 @@ class ModelConfigLoader:
         except yaml.YAMLError as exc:
             print(f"Error reading the YAML file: {exc}")
 
-    def load_multiple_yaml_files_monitoring(self, folder_path):
-        """Loads all YAML files from a folder."""
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".yaml") or filename.endswith(".yml"):
-                filepath = os.path.join(folder_path, filename)
-                self.load_yaml_file_monitoring(filepath)
-
-    def get_metrics_score_options(self):
-        self.load_multiple_yaml_files_monitoring("../Monitoring/data_drift_detectors")
-        metrics = set()  # Use a set to avoid duplicate values
-
-        for config in self.configurations_monitoring:
-            try:
-                # Extract the detector name from the configuration
-                name = config.get('drift_detector', {}).get('acronym', None)
-
-                if name:  # Avoid empty or None values
-                    metrics.add(name)
-            except Exception as e:
-                logging.error(f"Error processing configuration monitoring: {e}")
-
-        # Convert unique values into a list of dictionaries
-        return [{"label": metric, "value": metric} for metric in sorted(metrics)]
-    
     # Searches for the selected metric in the already loaded YAML files in configurations_monitoring
     def load_metric_descriptions(self, selected_metric):
         # Default values in case the metric is not found

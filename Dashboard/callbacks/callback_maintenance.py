@@ -1,68 +1,52 @@
+import os
 from dash import Input, Output, State, dcc, ALL, ctx, html
 import dash_bootstrap_components as dbc
 import dash
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
+from InfluxDb import influxdb_handler # retrieve the created instance
 import io
-from Dashboard.utils import model_selector
+from utils import model_information
 import plotly.express as px
 
 
 dfc = pd.DataFrame()
-
-
-""" @dash.callback(
-        [
-            Output("variable-store-maintenance", "data"),
-            Output("variable-table-maintenance", "data"),
-            Output("maintenance-graph", "figure"),
-        ],
-        Input("add-variable-btn-maintenance", "n_clicks"),
-        State("model-selector-maintenance", "value"),
-        State("type-selector-maintenance", "value"),
-        State("name-selector-maintenance", "value"),
-        State("variable-store-maintenance", "data"),
-        prevent_initial_call=True
-    )
-def update_variable_table_and_graph(n_clicks, model, var_type, var_name, current_data):
-        if not current_data:
-            return current_data, current_data, go.Figure()
-
-        new_entry = {"model": model, "type": var_type, "name": var_name}
-
-        if model and var_type and var_name and new_entry not in current_data:
-            current_data.append(new_entry)
-        else:
-            return current_data, current_data, dash.no_update
-
-        # Simulated time-series data
-        time = np.linspace(0, 225, 20)
-        fig = go.Figure()
-
-        for i, entry in enumerate(current_data):
-            simulated_data = np.sin(time / 30 + i) + np.random.normal(scale=0.1, size=len(time))
-            fig.add_trace(go.Scatter(
-                x=time,
-                y=simulated_data,
-                mode='lines',
-                name=f"{entry['model']} - {entry['name']}",
-                line=dict(width=2)
-            ))
-
-        fig.update_layout(title="Model Variable Simulation", xaxis_title="Time", yaxis_title="Value")
-        return current_data, current_data, fig
- """
+#set model pre selected 
+@dash.callback(
+            Output("model-selector-maintenance", "value"),
+            Input("model-data-store", "data")
+)
+def update_model_display(data):
+            if not data or "model_name" not in data or not data["model_name"]:
+                return "No Model Selected"
+            return f"{data['model_name']}"
+# show experiment ID selected
+@dash.callback(
+            Output("experiment-id-display-maintenence", "children"),
+            Input("store-selected-state", "data"),
+)
+def update_experiment_display(data):
+            if not data or "selected_experiment" not in data or not data["selected_experiment"]:
+                return "No experiment ID Selected"
+            return f"{data['selected_experiment']}"
+ 
 # Save modal
 @dash.callback(
-        Output("save-modal", "is_open"),
-        [Input("save-simulations", "n_clicks"), Input("cancel-save", "n_clicks")],
-        [State("save-modal", "is_open")],
-        prevent_initial_call=True
-    )
-def toggle_save_modal(save_click, cancel_click, is_open):
-        return not is_open
+    Output("save-modal", "is_open"),
+    Input("save-table-btn", "n_clicks"),
+    Input("cancel-save-btn", "n_clicks"),
+    Input("confirm-save-btn", "n_clicks"),
+    State("save-modal", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_save_modal(open_click, cancel_click, confirm_click, is_open):
+    ctx_trigger = ctx.triggered_id
+    if ctx_trigger == "save-table-btn":
+        return True  # Abrir modal
+    elif ctx_trigger in ["cancel-save-btn", "confirm-save-btn"]:
+        return False  # Cerrar modal
+    return is_open
 
 # Download Excel
 @dash.callback(
@@ -113,9 +97,10 @@ def confirm_maintenance(n_clicks, reason):
             prevent_initial_call=True
         )
 def update_model_types_maintenance(name):
-            #print("name",name)
-            types_variable = model_selector.get_unique_types_models(name)
-            #print("types_variable",types_variable)
+            types_variable = model_information.get_unique_types_models(name)
+            if types_variable is None:
+                  print("types_variable",types_variable)
+                  return []
             return types_variable
 @dash.callback(
             Output('name-selector-maintenance', 'options'),
@@ -134,112 +119,182 @@ def update_name_selector(selected_category,model_name):
             """
             if selected_category:
                 # Get names corresponding to the selected category
-                return model_selector.get_names_by_category(selected_category,model_name)
+                print("name_variable: ",model_information.get_names_by_category(selected_category,model_name))
+                return model_information.get_names_by_category(selected_category,model_name)
             else:
                 # Return an empty list if no category is selected
                 return []
             
-# Callback to initialize the graph
+# Callback to update the maintenance graph
 @dash.callback(
-            Output("maintenance-graph", "figure"),  # Graph where new variables will be added
-            Input("add-variable-btn-maintenance", "n_clicks"),  # Button to add variables
-            Input("selected-variables-maintenance", "data"),  # Variables selected by the user
-            State("maintenance-graph", "figure"),  # Current state of the graph
-            prevent_initial_call=True  # Prevents automatic execution
-        )
-def update_graph_var_maintenance(n_clicks, selected_variables, current_figure):
-            global dfc
-            dfc = influxdb_handler.get_data_by_batch_id2("32") #store_data['selected_experiment'])
+    Output("maintenance-graph", "figure"),
+    Output("prediction-table", "data"),  
+    Output("prediction-table", "columns"),
+    Input("time-window-slider", "value"),
+    Input("add-variable-btn-maintenance", "n_clicks"),
+    Input("selected-variables-maintenance", "data"),
+    State("maintenance-graph", "figure"),
+    prevent_initial_call=True
+)
+def update_graph_var_maintenance(range_slider, n_clicks, selected_variables, current_figure):
+    global dfc
+    dfc = influxdb_handler.get_data_by_batch_id2("4.0")
+    dfc["_time"] = pd.to_datetime(dfc["_time"], errors="coerce")
+    timestamps = sorted(dfc["_time"].dropna().unique())
+    start_time = timestamps[range_slider[0]]
+    end_time = timestamps[range_slider[1]]
+    dfc = dfc[(dfc["_time"] >= start_time) & (dfc["_time"] <= end_time)]
+    prediction_var = "CART_penicillin_prediction"
+    #data for table section
+    # Columnas base
+    columns_to_show = ["_time", prediction_var]
 
-            print("" )
-
-            print(f"🔄 Callback executed - Clicks: {n_clicks}, Selected variables: {selected_variables}")
-
-            if not selected_variables:
-                print("⚠ No variables selected. The graph will not be updated.")
-                return go.Figure(current_figure) if current_figure else go.Figure()
-
-            if dfc is None or "_time" not in dfc:
-                print("⚠ No data in dfc or missing '_time' column.")
-                return go.Figure(current_figure) if current_figure else go.Figure()
-
-            df = pd.DataFrame(dfc)
-            df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
-
-            fig = go.Figure(current_figure) if current_figure else go.Figure()
-
-            existing_traces = {trace.name for trace in fig.data}
-            print(f"📊 Already plotted variables: {existing_traces}")
-
-            colors = px.colors.qualitative.Dark24  
-
-            # Identify existing Y axes in the layout
-            existing_y_axes = {k for k in fig.layout if k.startswith("yaxis")}
-            num_existing_y_axes = len(existing_y_axes)
-
-            # Iterate over each selected variable and add it if not already plotted
-            for i, var_data in enumerate(selected_variables):
-                if not isinstance(var_data, dict) or "variable_name" not in var_data:
-                    print(f"⚠ Unexpected format in selected_variables[{i}]: {var_data}")
-                    continue
-
+    # Agregar variables seleccionadas
+    if selected_variables:
+        for var_data in selected_variables:
+            if isinstance(var_data, dict) and "variable_name" in var_data:
                 var = var_data["variable_name"]
+                if var in dfc.columns and var not in columns_to_show:
+                    columns_to_show.append(var)
 
-                if var in df.columns and var not in existing_traces:
-                    color = colors[num_existing_y_axes % len(colors)]  
-                    y_axis_name = f"yaxis{num_existing_y_axes + 1}"  # yaxis2, yaxis3, etc.
-                    y_axis_ref = f"y{num_existing_y_axes + 1}"  # y2, y3, etc.
+    # Filtrar el DataFrame
+    table_df = dfc[columns_to_show].dropna(subset=[prediction_var])
+    # Formato fecha y predicción
+    table_df["_time"] = table_df["_time"].dt.strftime('%m/%d/%Y %H:%M:%S')
+    if prediction_var in table_df.columns:
+        table_df[prediction_var] = table_df[prediction_var].round(4)
 
-                    # Add trace with its own Y axis
-                    fig.add_trace(go.Scatter(
-                        x=df["_time"].astype(str),
-                        y=df[var],
-                        mode="lines",
-                        name=var,
-                        yaxis=y_axis_ref,  
-                        line=dict(color=color)
-                        
-                    ))
+    # Preparar tabla
+    table_data = table_df.to_dict("records")
+    table_columns = [
+    {
+        "name": col,
+        "id": col,
+        "editable": col == prediction_var  # Solo editable si es la columna de predicción
+    }
+    for col in table_df.columns
+]
 
-                    # Add new Y axis to the layout
-                    fig.update_layout(**{
-                        y_axis_name: dict(
-                            title=dict(text=var, font=dict(color=color)),  
-                            tickfont=dict(color=color),
-                            anchor="x",
-                            overlaying="y",  
-                            side= 'right',
-                            position =  1 - (0.10 * (num_existing_y_axes+1 - 2)),
-                            showgrid=False
-                        )
-                    })
+    print(f"🔄 Callback executed - Clicks: {n_clicks}, Selected variables: {selected_variables}")
 
-                    num_existing_y_axes += 1
+    if not selected_variables:
+        print("⚠ No variables selected.")
 
-                    print(f"✅ Variable '{var}' added with axis {y_axis_ref}.")
+    if dfc is None or "_time" not in dfc:
+        print("⚠ No data or missing '_time' column.")
+        return go.Figure(current_figure) if current_figure else go.Figure()
 
-                else:
-                    print(f"⚠ Variable '{var}' is already plotted or does not exist in the data.")
+    df = pd.DataFrame(dfc)
+    df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
 
-            # Configure general graph layout
-            fig.update_layout(
-                xaxis=dict(
-                    title="Time",
-                    tickangle=-45,
-                    type="date"
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="top",
-                    y=-0.2,
-                    xanchor="center",
-                    x=0.5
-                )
-            )      
+    fig = go.Figure()
 
-            print(f"📊 Graph updated with {len(fig.data)} variables and multiple Y axes.")
+    colors = px.colors.qualitative.Dark24
+    existing_traces = set()
 
-            return fig
+    # --- Línea principal: CART_penicillin_prediction en eje Y principal ---
+    prediction_var = "CART_penicillin_prediction"
+    if prediction_var in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df["_time"].astype(str),
+            y=df[prediction_var],
+            mode="lines",
+            name=prediction_var,
+            yaxis="y",
+            line=dict(color="black", dash="dash")
+        ))
+        existing_traces.add(prediction_var)
+        print(f"✅ Línea '{prediction_var}' agregada al eje principal.")
+    else:
+        print(f"⚠ '{prediction_var}' no existe en los datos.")
+
+    # --- Agregar variables seleccionadas ---
+    for i, var_data in enumerate(selected_variables):
+        if not isinstance(var_data, dict) or "variable_name" not in var_data:
+            print(f"⚠ Formato inválido en selected_variables[{i}]: {var_data}")
+            continue
+
+        var = var_data["variable_name"]
+
+        if var in df.columns and var not in existing_traces:
+            color = colors[i % len(colors)]
+            axis_id = f"y{i + 3}"  # y3, y4, etc. (y y2 ya está usado)
+
+            fig.add_trace(go.Scatter(
+                x=df["_time"].astype(str),
+                y=df[var],
+                mode="lines",
+                name=var,
+                yaxis=axis_id,
+                line=dict(color=color)
+            ))
+            existing_traces.add(var)
+            print(f"✅ Variable '{var}' agregada al gráfico en eje {axis_id}.")
+        else:
+            print(f"⚠ '{var}' ya está graficada o no existe.")
+
+    # Ejes adicionales para cada variable seleccionada
+    extra_axes = {}
+    for i, var_data in enumerate(selected_variables):
+        axis_name = f"yaxis{i + 3}"  # yaxis3, yaxis4, ...
+        side = "right"
+        position = 1.0 - (i * 0.10) 
+
+        extra_axes[axis_name] = dict(
+            title=dict(
+                text=var_data["variable_name"],
+                font=dict(color=colors[i % len(colors)])
+            ),
+            tickfont=dict(color=colors[i % len(colors)]),
+            anchor="x",
+            overlaying="y",
+            side=side,
+            position=position,
+            showgrid=False
+        )
+
+    fig.update_layout(
+        xaxis=dict(title="Time", tickangle=-45, type="date"),
+        yaxis=dict(
+            showgrid=True,
+            title=dict(
+                text=prediction_var,
+                font=dict(color="black")
+            )
+        ),
+        yaxis2=dict(
+            visible=False  # ya no se usará y2
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        ),
+        **extra_axes
+    )
+
+    print(f"📊 Gráfico finalizado con {len(fig.data)} trazas.")
+    return fig, table_data, table_columns
+
+@dash.callback(
+    Output("time-slider-labels", "children"),
+    Output("time-window-slider", "max"),
+    Input("time-window-slider", "value"),
+    State("maintenance-graph", "figure")
+)
+def update_slider_labels(slider_range, figure):
+    dfc = influxdb_handler.get_data_by_batch_id2("4.0")
+    start_idx, end_idx = slider_range
+    if not dfc.empty:
+        timestamps = sorted(dfc["_time"].dropna().unique())
+        start_time = timestamps[start_idx] if start_idx < len(timestamps) else timestamps[0]
+        end_time = timestamps[end_idx] if end_idx < len(timestamps) else timestamps[-1]
+        return f"From: {start_time}  ➡  To: {end_time}", len(timestamps)
+    return "", 0
+
+
 @dash.callback(
             Output("selected-variables-maintenance", "data", allow_duplicate=True),
             Output("variable-table-maintenance", "children"),
@@ -286,4 +341,31 @@ def update_table(add_click, remove_clicks, selected_variable, current_data):
 
             # Wrap table with compact class
             table = dbc.Table(table_body, bordered=True, hover=True, striped=True, className="table-sm text-center")
+            print("current_data:",current_data)
+            print("table:",table)
             return current_data, table
+
+@dash.callback(
+    Output("save-confirmation", "children"),
+    Input("confirm-save-btn", "n_clicks"),
+    State("prediction-table", "data"),
+    State("comment-input", "value"),
+    prevent_initial_call=True
+)
+def save_table_with_comment(n_clicks, table_data, comment):
+    if not table_data:
+        return "⚠ No data to save."
+
+    df = pd.DataFrame(table_data)
+    os.makedirs("data/tables", exist_ok=True)
+
+    # Add a "Comment" column if one is provided
+    if comment:
+        df["Comment"] = comment.strip()
+
+    try:
+        filename = "data/tables/table_saved.csv"
+        df.to_csv(filename, index=False)
+        return f"✅ Table saved to '{filename}' with comment included."
+    except Exception as e:
+        return f"❌ Error saving the table: {e}"

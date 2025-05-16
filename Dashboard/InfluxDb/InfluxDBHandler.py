@@ -1,4 +1,4 @@
-from Dashboard.config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
+from config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
 from datetime import datetime, timedelta
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -88,43 +88,6 @@ class InfluxDBHandler:
             print(f"Error fetching buckets: {e}")
             return []
   
-    def save_predictions_to_influxdb(self, df,bucket="93dad319343df3bd", batch_id=2, measurement='predictions'):
-        """
-        Saves predictions to InfluxDB using InfluxDB 2.x.
-
-        Args:
-        - df: DataFrame containing the predictions.
-        - measurement: Name of the measurement in InfluxDB.
-        """
-        required_columns = {'Time (h)', 'Penicillin concentration(P:g/L)'}
-        if not required_columns.issubset(df.columns):
-            print(f"Error: Missing required columns. Expected: {required_columns}")
-            return
-
-        for _, row in df.iterrows():
-            try:
-                # Convert hours to seconds
-                hours = round(row['Time (h)'], 2)
-                seconds = int(hours * 3600)
-
-                # Generate a timestamp
-                timestamp = int(time.time() + seconds)
-
-                # Create the point for InfluxDB
-                point = Point(measurement) \
-                    .tag("project", "IndPenSim") \
-                    .tag("bioreactor_name", "A") \
-                    .tag("experiment_ID", batch_id) \
-                    .field("Penicillin_concentration", float(row['Penicillin concentration(P:g/L)'])) \
-                    .time(timestamp, WritePrecision.S)
-
-                # Write the point to InfluxDB
-                self.write_api.write(bucket=bucket, org=INFLUXDB_ORG, record=point)
-                print(f"Saved: {point}")
-
-            except Exception as e:
-                print(f"Error saving point to InfluxDB: {e}")
-
     def fetch_buckets_and_projects(self):
         """
         Retrieves buckets and their associated projects from InfluxDB.
@@ -183,64 +146,7 @@ class InfluxDBHandler:
             print(f"Error reading data from InfluxDB: {e}")
             return pd.DataFrame()
         
-    def send_chunk_to_influx(self, chunk, write_api):
-    # function to send each chunk to api influx
-        points = []
-        for _, row in chunk.iterrows():
-            try:
-                # Convert hours to seconds
-                hours = round(row['time'], 2)
-                seconds = hours * 3600
-                timestamp = int(time.time() + seconds)
-                
-                # Create points for each category
-                for category, variables in self.variable_categories.items():
-                    for field in variables:
-                        if field in row and pd.notna(row[field]):
-                            point = (
-                                Point("AllData")
-                                .tag("project", "STAMMProject")
-                                .tag("bioreactor_name", "C")
-                                .tag("experiment_ID", str(row['experiment_ID']))
-                                .tag("type", category)  # Add category as a tag
-                                .field(field, row[field])
-                                .time(timestamp, WritePrecision.S)
-                            )
-                            points.append(point)
-            except Exception as e:
-                print(f"Error in row: {row.to_dict()}\nError: {e}")
-        
-        if points:
-            write_api.write(bucket=self.bucket, record=points)
-
-    def migrate_data(self, file_path, sheet_name, chunk_size=5000):
-        print("Starting data migration...")
-        try:
-            # Read the entire Excel file
-            df = pd.read_excel(file_path, sheet_name=sheet_name)
-            
-            # Validate and convert columns to float
-            for field in self.all_fields:
-                if field in df.columns:
-                    df[field] = pd.to_numeric(df[field], errors='coerce')
-            
-            # Replace NaN with 0.0
-            df = df.fillna(0.0)
-
-            # Initialize client and write API
-            with InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG) as client:
-                write_api = client.write_api(write_options=SYNCHRONOUS)
-                
-                # Split data into chunks and send
-                for start in range(0, len(df), chunk_size):
-                    chunk = df.iloc[start:start + chunk_size]
-                    self.send_chunk_to_influx(chunk, write_api)
-                    print(f"Processed a chunk of {len(chunk)} rows.")
-        except Exception as e:
-            print(f"Error during migration: {e}")
-
-        print(f"Data successfully migrated to bucket {self.bucket}.")
-
+    
     def get_experiment_ids_from_bucket(self):
         """
         Retrieves a unique list of experiment_ID from the specified bucket in InfluxDB.
@@ -281,111 +187,7 @@ class InfluxDBHandler:
         except Exception as e:
             print(f"Error retrieving experiment_ID: {e}")
             return []
-
-    def get_category_names(self):
-        """
-        Returns the list of category names from the variable_categories attribute.
-
-        Returns:
-            list: A list of category names.
-        """
-        return list(self.variable_categories.keys())
-    
-    def get_names_by_category(self, category):
-        """
-        Returns the list of variable names for a given category.
-
-        Args:
-            category (str): The category name to retrieve variables for.
-
-        Returns:
-            list: A list of variable names for the given category, or an empty list if the category is not found.
-        """
-        return self.variable_categories.get(category, [])
-
-    def get_data_by_batch_id(self, batch_id):
-        """
-        Returns a DataFrame with all fields and values associated with a given batch_id.
-
-        Args:
-            batch_id (int/str): The batch identifier.
-
-        Returns:
-            pd.DataFrame: DataFrame with the data corresponding to the batch_id.
-        """
-        try:
-            # Validate batch_id
-            if not batch_id:
-                raise ValueError("The batch_id cannot be None or empty.")
-
-            # List of fields to filter
-            fields_to_filter = [
-                "CO2_percent_in_off_gas", "acid_flow_rate", "aeration_rate", "agitator", "viscosity", "vessel_weight",
-                "temperature", "vessel_volume", "sugar_feed_rate", "substrate_concentration", "penicillin_concentration",
-                "oxygen_uptake_rate", "air_head_pressure", "ammonia_shots", "base_flow_rate", "carbon_evolution_rate",
-                "heating_water_flow_rate", "offline_biomass_concentration", "offline_penicillin_concentration",
-                "oil_flow", "oxygen_in_percent_in_off_gas", "NH3_concentration", "PAA_concentration", "PAA_flow",
-                "dissolved_oxygen_concentration", "dumped_broth_flow", "generated_heat"
-            ]
-
-            # Convert the Python list to a Flux array format
-            fields_flux_array = ', '.join([f'"{field}"' for field in fields_to_filter])
-
-            # Build the Flux query
-            query = f"""
-            from(bucket: "{self.bucket}")
-            |> range(start: -90d)  // Adjust the time range as needed
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(batch_id)}")
-            |> filter(fn: (r) => contains(value: r["_field"], set: [{fields_flux_array}]))
-            """
-            #print("query",query)
-            # Execute the query
-            results = self.query_api.query(query=query)
-            
-            # If no results returned, print and return empty DataFrame
-            if not results:
-                print(f"No data found for batch_id {batch_id}.")
-                return pd.DataFrame()
-            print("results",results)
-            # Prepare data to store the results
-            data = []  # List to store data
-
-            # Process the query results
-            for table in results:
-                for record in table.records:
-                    # Add the entire record to the data list
-                    data.append(record.values)  # Add each record's values to the data list
-
-            # Convert to DataFrame
-            df = pd.DataFrame(data)
-
-            # Check if the DataFrame is non-empty
-            if not df.empty:
-                # Extract '_time', '_field' and '_value'
-                # Restructure the data by pivoting the '_field' into columns, and '_value' as the values
-                df_pivot = df.pivot(index='_time', columns='_field', values='_value')
-
-                # Ensure only the relevant fields are included in the DataFrame
-                df_pivot = df_pivot[fields_to_filter]  # Only keep the fields of interest
-
-                # Reset index to make '_time' a column again
-                df_pivot.reset_index(inplace=True)
-
-                # Debug: Print the DataFrame to verify the structure
-                #print("Final DataFrame with all fields:", df_pivot)  # This will show the reformatted DataFrame
-                return df_pivot
-            else:
-                print(f"No data found for batch_id {batch_id}.")
-                return pd.DataFrame()
-
-        except ValueError as ve:
-            print(f"Invalid input: {ve}")
-            return pd.DataFrame()
-
-        except Exception as e:
-            print(f"Error retrieving data for batch_id {batch_id}: {e}")
-            return pd.DataFrame()
-        
+  
     def get_data_by_batch_id2(self, batch_id):
         """
         Returns a DataFrame with all fields and values associated with a given batch_id.
@@ -452,6 +254,54 @@ class InfluxDBHandler:
         except Exception as e:
             print(f"Error retrieving data for batch_id {batch_id}: {e}")
             return pd.DataFrame()
+    
+    def get_data_until_latest(self, batch_id):
+        """
+        Returns a DataFrame with all records up to the latest entry for a given batch_id.
+
+        Args:
+            batch_id (int/str): The batch identifier.
+
+        Returns:
+            pd.DataFrame: DataFrame with all data up to the most recent point.
+        """
+        try:
+            if not batch_id:
+                raise ValueError("The batch_id cannot be None or empty.")
+
+            # Flux query to retrieve all data for the given batch_id
+            query = f"""
+            from(bucket: "{str(INFLUXDB_BUCKET)}")
+            |> range(start: 0)  // Get all data from the beginning of the bucket
+            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(batch_id)}")
+            """
+            
+            results = self.query_api.query(query=query)
+
+            if not results:
+                print(f"No data found for batch_id {batch_id}.")
+                return pd.DataFrame()
+
+            data = []
+            for table in results:
+                for record in table.records:
+                    data.append(record.values)
+
+            df = pd.DataFrame(data)
+
+            if not df.empty:
+                df = df[["_time", "_field", "_value"]]
+                df_pivot = df.pivot(index="_time", columns="_field", values="_value")
+                df_pivot.reset_index(inplace=True)
+                return df_pivot
+            else:
+                print(f"No data found for batch_id {batch_id}.")
+                return pd.DataFrame()
+
+        except Exception as e:
+            print(f"Error retrieving data until latest for batch_id {batch_id}: {e}")
+            return pd.DataFrame()
+
 
 
     def get_distinct_experiment_ids(self, bucket_name, time_range="-90d"):
@@ -694,3 +544,23 @@ class InfluxDBHandler:
         except Exception as e:
             print(f"Error retrieving test data for experiment_id {experiment_id}: {e}")
             return []
+
+    def get_recent_experiment_ids(self, bucket: str, minutes: int = 5):
+        """
+        Returns experiment IDs with data in the last `minutes` minutes.
+        """
+        query = f'''
+        import "influxdata/influxdb/schema"
+        from(bucket: "{bucket}")
+        |> range(start: -{minutes}m)
+        |> keep(columns: ["{str(BACH_ID)}"])
+        |> group(columns: ["{str(BACH_ID)}"])
+        |> distinct(column: "{str(BACH_ID)}")
+        |> sort(columns: ["{str(BACH_ID)}"])
+        '''
+        tables = self.query_api.query(org=self.org, query=query)
+        experiment_ids = []
+        for table in tables:
+            for record in table.records:
+                experiment_ids.append(record.get_value())
+        return list(set(experiment_ids))

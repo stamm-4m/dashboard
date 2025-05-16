@@ -5,9 +5,9 @@ import plotly.graph_objs as go
 import numpy as np
 import scipy.stats as stats
 
-from Dashboard.utils import model_information
-from Dashboard.utils.utils_data_drift import get_result_metric
-from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
+from utils import model_information
+from utils.utils_data_drift import get_result_metric,get_detector_description
+from InfluxDb import influxdb_handler  # Retrieve the created instance
 
 # Load input for each selected model
 @dash.callback(
@@ -18,7 +18,7 @@ from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 def update_input_options(selected_model):
     print("value", selected_model)
     if selected_model:
-        return model_information.load_inputs_from_yaml(selected_model)
+        return model_information.load_inputs_from_configuration(selected_model)
     return []  # If no model is selected, leave it empty
 
 # Load selected metrics
@@ -31,7 +31,7 @@ def update_metrics_section(selected_metric):
         return html.Div()  # If no metric is selected, return an empty div
 
     # Get information about the selected metric
-    metric_info = model_information.load_metric_descriptions(selected_metric)
+    metric_info = get_detector_description(selected_metric)
     if not metric_info:
         return html.Div(html.P("No information available for this metric."))
 
@@ -118,9 +118,9 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input,met
             test_d = np.array(test_data)
             noise = np.random.normal(0, 0.1, size=test_d.shape)
             training_data = test_d + noise
-    
-    print("training_data", training_data)
-    print("test_data", test_data)
+    print("Data:")
+    #print("training_data", training_data)
+    #print("test_data", test_data)
 
     # 4. Create density plot
     fig = go.Figure()

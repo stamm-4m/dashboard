@@ -1,8 +1,8 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-from Dashboard.InfluxDb import influxdb_handler
-from Dashboard.utils import model_selector, model_information
+from InfluxDb import influxdb_handler
+from utils import model_information
 
 def data_drift_layout():
         experiments_id = influxdb_handler.get_experiment_ids_from_bucket()
@@ -77,8 +77,7 @@ def data_drift_layout():
             ], className="mb-4"),
 
             dbc.Row([
-                dbc.Col([
-                    html.H2("Result "),        
+                dbc.Col([    
                     html.Div(
                         id="metrics-result",
                         className="d-flex align-items-center justify-content-center")

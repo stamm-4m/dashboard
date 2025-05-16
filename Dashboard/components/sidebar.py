@@ -12,6 +12,9 @@ def sidebar():
         dcc.Store(id='store-selected-experiment', storage_type='local'),
         # Stores which steps are enabled
         dcc.Store(id="step-store", data={"step": 1}),
+        
+        
+
 
         html.Hr(),
         html.P(
@@ -72,7 +75,7 @@ def sidebar():
                     id="monitoring-collapse", 
                     is_open=False),
                 dbc.NavLink(
-                    html.Span([html.Span("4", className="circle-number"),html.Span("Maintenance", className="nav-text")], className="nav-item-content"),
+                    html.Span([html.Span("4", className="circle-number"),html.Span("Simulation assessment", className="nav-text")], className="nav-item-content"),
                     href="/maintenance",
                     className="sidebar-link",
                     active="exact",

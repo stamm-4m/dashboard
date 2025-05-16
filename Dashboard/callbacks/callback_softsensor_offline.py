@@ -3,10 +3,10 @@ from dash import Input, Output, State, html,ALL,ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.utils import model_information
-from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
-from Dashboard.utils.utils_sofsensors_offline import reload_models_yaml, generate_predictions, generate_prediction_name # the necessary utils functions for the callbacks are loaded
-from Dashboard.pages.model_details_view import generate_model_details_view
+from utils import model_information
+from InfluxDb import influxdb_handler # retrieve the created instance
+from utils.utils_sofsensors_offline import reload_models, generate_predictions, generate_prediction_name # the necessary utils functions for the callbacks are loaded
+from pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
 
@@ -147,8 +147,8 @@ def update_name_selector(selected_category,model_name):
             Input('model-selector-off', 'n_clicks')
         )
 def update_model_options(n_clicks):
-            reload_models_yaml()
-            return model_information.get_model_name_options()
+    reload_models()
+    return model_information.get_model_name_options()
         
         # Function to update the ypes  of model inputs
 @dash.callback(
@@ -157,10 +157,8 @@ def update_model_options(n_clicks):
             prevent_initial_call=True
         )
 def update_model_types(name):
-            #print("name",name)
-            types_variable = model_information.get_unique_types_models(name)
-            #print("types_variable",types_variable)
-            return types_variable 
+    types_variable = model_information.get_unique_types_models(name)
+    return types_variable 
 
 @dash.callback(
             [Output('model-details-off', 'children'),
@@ -179,8 +177,8 @@ def display_model_details(selected_model):
                     "model_file": config['model_description'].get('config_files', {}).get('model_file', 'N/A'),
                     "model_name": config['model_description'].get('model_name', 'N/A'),
                     "language": config['model_description'].get('language', 'N/A'),
-                    "predictions": config['output_features'],
-                    "features": config['input_features']
+                    "predictions": config['outputs'].get('predictions', 'N/A'),
+                    "features": config['inputs'].get('features', 'N/A')
                 }
                 return generate_model_details_view(config), model_data
             else:

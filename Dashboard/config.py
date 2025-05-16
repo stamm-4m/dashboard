@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv(dotenv_path='Dashboard/.env')
-
+load_dotenv()
 
 def check_env_var(var_name):
     value = os.getenv(var_name)
