@@ -10,6 +10,7 @@ def sidebar():
         dcc.Store(id='store-selected-view', storage_type='local'),
         dcc.Store(id='store-selected-bucket', storage_type='local'),
         dcc.Store(id='store-selected-experiment', storage_type='local'),
+        dcc.Store(id='store-metric-params', storage_type='memory'),
         # Stores which steps are enabled
         dcc.Store(id="step-store", data={"step": 1}),
         
@@ -54,7 +55,8 @@ def sidebar():
                             disabled=True,  # Default value disabled
                             id="online-link",
                         ),
-                        dbc.NavLink("Load soft sensor", href="/soft-sensors/load-soft-sensor", className="sidebar-link ms-4", id="load-soft-link"),
+                        # Commented for we will working next version
+                        # dbc.NavLink("Load soft sensor", href="/soft-sensors/load-soft-sensor", className="sidebar-link ms-4", id="load-soft-link"),
                     ],
                     id="soft-sensors-collapse",
                     is_open=False,  # Starts closed

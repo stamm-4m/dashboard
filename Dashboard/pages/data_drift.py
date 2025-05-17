@@ -25,16 +25,16 @@ def data_drift_layout():
                                 placeholder="Select soft sensors",
                                 style={'width': '100%', 'whiteSpace': 'normal'}
                             ),
-                        ], width=5),
+                        ], width=6),
 
                         dbc.Col([
-                            html.Label("Input model:"),
+                            html.Label("Drift detector:"),
                             dcc.Dropdown(
-                                id='input-model-dropdown',
-                                options=[],
+                                id='metric-score-dropdown',
+                                options=metrics_score_options,
                                 className='mb-2',
                                 searchable=True,
-                                placeholder="Select Input Model",
+                                placeholder="Select Metric Score",
                                 style={'width': '100%'}
                             ),
                         ], width=3),
@@ -49,23 +49,13 @@ def data_drift_layout():
                                 placeholder="Select experiment ID",
                                 style={'width': '100%'}
                             ),
-                        ], width=2),
-
-                        dbc.Col([
-                            html.Label("Metric score:"),
-                            dcc.Dropdown(
-                                id='metric-score-dropdown',
-                                options=metrics_score_options,
-                                className='mb-2',
-                                searchable=True,
-                                placeholder="Select Metric Score",
-                                style={'width': '100%'}
-                            ),
-                        ], width=2)
+                        ], width=3)
+                        
                     ])
                 ])
             ], className="mb-3 shadow-sm"),
             html.Div(id="metrics-container"),  # Container where selected metrics will be added
+            
             # Metric result display
             dbc.Row([
                 dbc.Col([

@@ -206,7 +206,6 @@ class ModelInformation:
         config = self.get_configuration_by_model_name(model_name)
         #model_config = config.get('ml_model_configuration', {})
         inputs = config['inputs'].get("features", [])
-        print("inputs",inputs)
         # Create options for the Dropdown
         return [{"label": feature['name'], "value": feature['name']} for feature in inputs]
 

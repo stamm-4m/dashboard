@@ -465,7 +465,7 @@ class InfluxDBServices:
                 |> filter(fn: (r) => {" or ".join(f'r["{str(BACH_ID)}"] == "{str(e)}.0"' for e in experiments_id)})
                 |> keep(columns: ["_value"])
         """
-        print("query training:",query)
+        #print("query training:",query)
         # Ejecutar la consulta
         result = self.connector.query_api.query(org=self.connector.org, query=query)
 
@@ -488,7 +488,7 @@ class InfluxDBServices:
                 
             """
             #|> keep(columns: ["_value"])
-            print("query test:",query)
+            #print("query test:",query)
             # Execute query
             result = self.connector.query_api.query(query=query)
 

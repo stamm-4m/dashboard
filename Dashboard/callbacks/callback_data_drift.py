@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, Input, Output, State
+from dash import html, dcc, Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import numpy as np
@@ -9,26 +9,21 @@ from utils import model_information
 from utils.utils_data_drift import get_result_metric,get_detector_description
 from InfluxDb import influxdb_handler  # Retrieve the created instance
 
-# Load input for each selected model
-@dash.callback(
-    Output('input-model-dropdown', 'options'),
-    Input('soft-sensor-input', 'value'),
-    prevent_initial_call=True
-)
-def update_input_options(selected_model):
-    print("value", selected_model)
-    if selected_model:
-        return model_information.load_inputs_from_configuration(selected_model)
-    return []  # If no model is selected, leave it empty
 
 # Load selected metrics
 @dash.callback(
     Output("metrics-container", "children"),
-    Input("metric-score-dropdown", "value")
+    Input("metric-score-dropdown", "value"),
+    State("soft-sensor-input", "value"),
+    prevent_initial_call=True
 )
-def update_metrics_section(selected_metric):
+def update_metrics_section(selected_metric, selected_model):
     if not selected_metric:
-        return html.Div()  # If no metric is selected, return an empty div
+        return html.Div()  # If no metric is selected, return an empty div,# If no model is selected, leave it empty
+    
+    model_options = [] # If no model is selected, leave it empty
+    if selected_model:
+        model_options = model_information.load_inputs_from_configuration(selected_model)
 
     # Get information about the selected metric
     metric_info = get_detector_description(selected_metric)
@@ -46,18 +41,42 @@ def update_metrics_section(selected_metric):
                 # Left column: Aligned inputs
                 dbc.Col([
                     html.H6("Metric Parameters", className="mb-3"),
+                    dbc.Row([
+                            dbc.Col([
+                                html.Label("Variable")
+                            ], width=6),
+                            dbc.Col([
+                                dcc.Dropdown(
+                                    id='input-model-dropdown',
+                                    options=model_options,
+                                    className='mb-2',
+                                    searchable=True,
+                                    placeholder="Select Input Model",
+                                    style={'width': '100%'}
+                                ),
+                            ], width=6),
+                    ]),
                     *[
                         dbc.Row([
+
                             dbc.Col(
-                                html.Label([
+                               html.Label([
                                     f"{param.get('name', 'unknown')}",
-                                    dbc.Tooltip(param.get('description', 'No description available'),
-                                                target=f"input-{selected_metric}-{param.get('name', 'unknown')}")
+                                    html.Span(" ⓘ", id=f"tooltip-{selected_metric.strip()}-{param.get('name', 'unknown')}",
+                                            style={"textDecoration": "underline dotted", "cursor": "help"}),
+                                    dbc.Tooltip(
+                                        param.get('description', 'No description available'),
+                                        target=f"tooltip-{selected_metric.strip()}-{param.get('name', 'unknown')}"
+                                    )
                                 ]), width=6, className="d-flex align-items-center"
                             ),
                             dbc.Col(
                                 dcc.Input(
-                                    id=f"input-{selected_metric}-{param.get('name', 'unknown')}",
+                                    id={
+                                        'type': 'metric-param-input',
+                                        'metric': selected_metric.strip(),
+                                        'name': param.get('name', 'unknown')
+                                    },
                                     type="number",
                                     value=param.get('default', 0),
                                     className="mb-2",
@@ -91,20 +110,21 @@ def update_metrics_section(selected_metric):
     State("input-experiment-dropdown", "value"),
     State("input-model-dropdown", "value"),
     State("metric-score-dropdown", "value"),
+    Input("store-metric-params", "data"),
     prevent_initial_call=True
 )
-def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input,metric_score):
+def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input,metric_score,param_dinamic_values):
     if not (soft_sensor and experiment_id and selected_input):
         print("dash.no_update")
         return dash.no_update  # Prevent update if values are missing
-
+    
     # 1. Retrieve data from the selected model's YAML
     config = model_information.get_configuration_by_model_name(soft_sensor)  # Implement this function
     training_info = config["training_information"]
 
     # 2. Extract values from experiments_id
     experiments_id = training_info.get("experiments_ID", {})
-    print("experiments_id", experiments_id)
+    print("training info experiments_id", experiments_id)
     if not experiments_id:
         return dash.no_update  # Prevent errors if no data is found
 
@@ -178,7 +198,21 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input,met
         template="plotly_white"
     )
     
-    metric_result = get_result_metric(metric_score,training_data,test_data)
+    metric_result = get_result_metric(metric_score,training_data,test_data,param_dinamic_values)
     metric_result = html.H2(f" {metric_score} = {metric_result}")
 
     return fig2, fig, metric_result
+
+@dash.callback(
+    Output("store-metric-params", "data"),
+    Input({'type': 'metric-param-input', 'metric': ALL, 'name': ALL}, 'value'),
+    State({'type': 'metric-param-input', 'metric': ALL, 'name': ALL}, 'id'),
+)
+def process_dynamic_inputs(values, ids):
+    grouped = {}
+    for value, id_ in zip(values, ids):
+        metric = id_.get('metric')
+        name = id_.get('name')
+        print(f"Métrica: {metric}, Parámetro: {name}, Valor: {value}")
+        grouped.setdefault(metric, {})[name] = value
+    return grouped

@@ -8,7 +8,7 @@ from drift_detectors_pack.drift_detectors.multivariate.pca_cd import PCA_CD
 
 
 
-def get_result_metric(score, data_training, data_test):
+def get_result_metric(score, data_training, data_test,param_dinamic_values):
     """
     Executes the selected drift detection algorithm and returns the result.
 
@@ -21,14 +21,18 @@ def get_result_metric(score, data_training, data_test):
         str or list: Formatted drift score or list of detected drift indices/statuses.
     """
     logging.info(f"Received score: {score}")
+    
     score = score.strip()
-
+    params = param_dinamic_values.get(score, {})
+    print(f"Paremeters {params} to {score}")
     try:
         # PSI (Population Stability Index)
         if score == "PSI":
+            bins = params.get('bins') or 10
+            epsilon = float(params.get('epsilon', 1e-8))
             logging.info("Calculating PSI (Population Stability Index)...")
             psi = PSI()
-            result = psi.calculate(data_training, data_test)
+            result = psi.calculate(data_training, data_test,bins,epsilon)
             logging.info(f"PSI score: {result.drift_score:.4f}")
             return f"{result.drift_score:.4f}"
 
@@ -55,9 +59,10 @@ def get_result_metric(score, data_training, data_test):
 
         # ADWIN (ADaptive WINdowing)
         elif score == "Adwin":
+            delta = params.get('delta') or 0.002
             logging.info("Calculating ADWIN (ADaptive WINdowing)...")
             adwin = Adwin()
-            result = adwin.calculate(data_test)
+            result = adwin.calculate(data_test, delta)
             logging.info(f"ADWIN drift indices: {result.drift_indices}")
             return result.drift_indices
 
