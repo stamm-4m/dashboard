@@ -7,3 +7,12 @@
 [submodule "multi_db_connector"]
 	path = multi_db_connector
 	url = git@gitlab.com:stamm-4m/multi-db-connector.git
+[submodule "Dashboard/drift_detectors"]
+	path = Dashboard/drift_detectors
+	url = git@gitlab.com:stamm-4m/drift_detectors.git
+[submodule "Dashboard/db_connector"]
+	path = Dashboard/db_connector
+	url = git@gitlab.com:stamm-4m/db_connector.git
+[submodule "Dashboard/drift_detector_pack"]
+	path = Dashboard/drift_detector_pack
+	url = git@gitlab.com:stamm-4m/drift_detectors.git
