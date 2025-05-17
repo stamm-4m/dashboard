@@ -1,10 +1,10 @@
 import numpy as np
 import logging
-from drift_detectors.drift_detectors.univariate.adwin import Adwin
-from drift_detectors.drift_detectors.univariate.psi import PSI
-from drift_detectors.drift_detectors.univariate.ks import KSDetector
-from drift_detectors.drift_detectors.multivariate.KDQ_tree import KDQTree
-from drift_detectors.drift_detectors.multivariate.pca_cd import PCA_CD
+from drift_detectors_pack.drift_detectors.univariate.adwin import Adwin
+from drift_detectors_pack.drift_detectors.univariate.psi import PSI
+from drift_detectors_pack.drift_detectors.univariate.ks import KSDetector
+from drift_detectors_pack.drift_detectors.multivariate.KDQ_tree import KDQTree
+from drift_detectors_pack.drift_detectors.multivariate.pca_cd import PCA_CD
 
 
 

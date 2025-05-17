@@ -1,5 +1,5 @@
 from config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
-from multi_db_connector.influxdb_connector import InfluxDBConnector
+from db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
 import pandas as pd
 import logging
 

@@ -5,8 +5,8 @@ import logging
 from config import BASE_URL_API
 from utils.utils_apiclient import ApiClient
 from io import StringIO
-from drift_detectors.drift_detectors.utility import  metadata
-from drift_detectors.drift_detectors.model_disagreement import DisagreementMetricLoader
+from drift_detectors_pack.drift_detectors.utility import  metadata
+from drift_detectors_pack.drift_detectors.model_disagreement import DisagreementMetricLoader
 
 
 

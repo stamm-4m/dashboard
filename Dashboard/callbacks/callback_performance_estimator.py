@@ -11,7 +11,7 @@ from InfluxDb import influxdb_handler
 from utils import model_information
 from utils.utils_performance_estimator import get_next_color,reload_models
 from utils.utils_global import disabled_figure, generate_prediction_name
-from drift_detectors.drift_detectors.model_disagreement import DisagreementMetricLoader
+from drift_detectors.model_disagreement import DisagreementMetricLoader
 
         # Function to update the options of the existing models
 @dash.callback(

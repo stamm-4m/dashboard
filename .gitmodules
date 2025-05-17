@@ -16,3 +16,6 @@
 [submodule "Dashboard/drift_detector_pack"]
 	path = Dashboard/drift_detector_pack
 	url = git@gitlab.com:stamm-4m/drift_detectors.git
+[submodule "Dashboard/drift_detectors_pack"]
+	path = Dashboard/drift_detectors_pack
+	url = git@gitlab.com:stamm-4m/drift_detectors_pack.git
