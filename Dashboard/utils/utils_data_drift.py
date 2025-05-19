@@ -68,9 +68,10 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
 
         # Kolmogorov-Smirnov Detector
         elif score == "KSDetector":
+            alpha = params.get('alpha') or 0.05
             logging.info("Calculating KSDetector (Kolmogorov-Smirnov Test)...")
             ks = KSDetector()
-            result = ks.calculate(data_training, data_test)
+            result = ks.calculate(data_training, data_test,alpha)
             logging.info(f"KS result: {result}")
             return result
 

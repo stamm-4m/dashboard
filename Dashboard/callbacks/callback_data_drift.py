@@ -9,21 +9,28 @@ from utils import model_information
 from utils.utils_data_drift import get_result_metric,get_detector_description
 from InfluxDb import influxdb_handler  # Retrieve the created instance
 
+UNIVARIABLE_METRICS = ["Adwin","KSDetector","PSI"]
 
 # Load selected metrics
 @dash.callback(
     Output("metrics-container", "children"),
+    Output("graph-details", "style"),
     Input("metric-score-dropdown", "value"),
     State("soft-sensor-input", "value"),
     prevent_initial_call=True
 )
 def update_metrics_section(selected_metric, selected_model):
     if not selected_metric:
-        return html.Div()  # If no metric is selected, return an empty div,# If no model is selected, leave it empty
+        return html.Div(),{"display": "none"}  # If no metric is selected, return an empty div,# If no model is selected, leave it empty
     
     model_options = [] # If no model is selected, leave it empty
     if selected_model:
         model_options = model_information.load_inputs_from_configuration(selected_model)
+    variable_show = {"display":"none"}
+    graph_show = {"display":"none"}
+    if selected_metric.strip() in UNIVARIABLE_METRICS:
+        variable_show = {"display":"block"}
+        graph_show = {"display":"block"}
 
     # Get information about the selected metric
     metric_info = get_detector_description(selected_metric)
@@ -40,22 +47,30 @@ def update_metrics_section(selected_metric, selected_model):
             dbc.Row([
                 # Left column: Aligned inputs
                 dbc.Col([
-                    html.H6("Metric Parameters", className="mb-3"),
-                    dbc.Row([
-                            dbc.Col([
-                                html.Label("Variable")
-                            ], width=6),
-                            dbc.Col([
+                    html.H6("Metric Parameters"),
+                    html.Div(
+                        id="variable-section",
+                        style=variable_show,
+                        children=[
+                        dbc.Row([
+                            dbc.Col(
+                                html.Label("Variable"),
+                                width=6,
+                                className="d-flex align-items-center"
+                            ),
+                            dbc.Col(
                                 dcc.Dropdown(
                                     id='input-model-dropdown',
                                     options=model_options,
-                                    className='mb-2',
                                     searchable=True,
                                     placeholder="Select Input Model",
                                     style={'width': '100%'}
                                 ),
-                            ], width=6),
-                    ]),
+                                width=6
+                            )
+                        ], className="mb-2")
+                    ]
+                    ),
                     *[
                         dbc.Row([
 
@@ -98,7 +113,7 @@ def update_metrics_section(selected_metric, selected_model):
             ])
         ])
     ], className="mb-3 shadow-sm")
-    return new_metric_section
+    return new_metric_section,graph_show
 
 # Callback to generate density plots
 @dash.callback(

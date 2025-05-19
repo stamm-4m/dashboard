@@ -72,24 +72,27 @@ def data_drift_layout():
                         id="metrics-result",
                         className="d-flex align-items-center justify-content-center")
                         ], width=4, className="d-flex align-items-center"),
-            ], className="mb-4"),
-
-            # Monitored inputs section
-            html.H4("Monitored inputs", className="text-center mb-3"),
-
+            ]),
             dbc.Row([
-                #  Line graph
-                dbc.Col([
-                    # Initial empty graph component
-                    dcc.Graph(id="density-plot", figure={})
-
-                ], width=6),
-
-                #  Histogram graph
-                dbc.Col([
-                   
-                    dcc.Graph(id='density-plot-hist',figure={}),
-                    
-                ], width=6),
-            ])
-        ], className="container")
+            dbc.Col([
+                html.Div(id='graph-details', style={"display": "none"}, children=[
+                    dbc.Accordion([
+                        dbc.AccordionItem(
+                            title=html.Div("Monitored inputs"),
+                            children=[
+                                dbc.Row([
+                                    dbc.Col([
+                                        dcc.Graph(id="density-plot", figure={})
+                                    ], width=6),
+                                    dbc.Col([
+                                        dcc.Graph(id='density-plot-hist', figure={})
+                                    ], width=6),
+                                ], className="mb-4")
+                            ],
+                         
+                        )
+                    ], start_collapsed=True, flush=False)
+                ])
+            ], width=12)
+        ])
+    ], className="container")

@@ -1,5 +1,8 @@
 from config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
 from db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
+from influxdb_client import Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
+
 import pandas as pd
 import logging
 
@@ -520,3 +523,15 @@ class InfluxDBServices:
             for record in table.records:
                 experiment_ids.append(record.get_value())
         return list(set(experiment_ids))
+
+    def write_points(self, points):
+        with self.client.write_api(write_options=SYNCHRONOUS) as write_api:
+            for p in points:
+                point = (
+                    Point(p["measurement"])
+                    .tag("nivel", p["tags"]["level"])
+                    .tag("tipo", p["tags"]["type"])
+                    .field("value", p["fields"]["value"])
+                    .time(p["time"], WritePrecision.NS)
+                )
+                write_api.write(bucket=self.bucket, org=self.org, record=point)

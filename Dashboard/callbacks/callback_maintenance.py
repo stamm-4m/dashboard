@@ -9,6 +9,7 @@ from InfluxDb import influxdb_handler # retrieve the created instance
 import io
 from utils import model_information
 import plotly.express as px
+from utils.utils_maintenance import generate_prediction_name
 
 
 dfc = pd.DataFrame()
@@ -19,7 +20,8 @@ dfc = pd.DataFrame()
 )
 def update_model_display(data):
             if not data or "model_name" not in data or not data["model_name"]:
-                return "No Model Selected"
+                model_options = model_information.get_model_name_options()
+                return "No selected model"
             return f"{data['model_name']}"
 # show experiment ID selected
 @dash.callback(
@@ -130,21 +132,31 @@ def update_name_selector(selected_category,model_name):
     Output("maintenance-graph", "figure"),
     Output("prediction-table", "data"),  
     Output("prediction-table", "columns"),
+    Input("model-data-store", "data"),
+    Input("store-selected-state", "data"),
     Input("time-window-slider", "value"),
     Input("add-variable-btn-maintenance", "n_clicks"),
     Input("selected-variables-maintenance", "data"),
     State("maintenance-graph", "figure"),
     prevent_initial_call=True
 )
-def update_graph_var_maintenance(range_slider, n_clicks, selected_variables, current_figure):
+def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_variables, current_figure):
     global dfc
-    dfc = influxdb_handler.get_data_by_batch_id2("4.0")
+    if not data_exp or "selected_experiment" not in data_exp or not data_exp["selected_experiment"]:
+        print("No experiment ID Selected")
+        return go.Figure(), [],[]
+    
+    dfc = influxdb_handler.get_data_by_batch_id2(data_exp["selected_experiment"])
     dfc["_time"] = pd.to_datetime(dfc["_time"], errors="coerce")
     timestamps = sorted(dfc["_time"].dropna().unique())
     start_time = timestamps[range_slider[0]]
     end_time = timestamps[range_slider[1]]
     dfc = dfc[(dfc["_time"] >= start_time) & (dfc["_time"] <= end_time)]
-    prediction_var = "CART_penicillin_prediction"
+    print('data["model_name"]: ',data["model_name"])
+    if not data or "model_name" not in data or not data["model_name"]:
+        print("no data model name")
+        return go.Figure(),[],[]
+    prediction_var = generate_prediction_name(data["model_name"])
     #data for table section
     # Columnas base
     columns_to_show = ["_time", prediction_var]
@@ -182,7 +194,7 @@ def update_graph_var_maintenance(range_slider, n_clicks, selected_variables, cur
 
     if dfc is None or "_time" not in dfc:
         print("⚠ No data or missing '_time' column.")
-        return go.Figure(current_figure) if current_figure else go.Figure()
+        return go.Figure(current_figure) if current_figure else go.Figure(),[],[]
 
     df = pd.DataFrame(dfc)
     df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
@@ -193,7 +205,6 @@ def update_graph_var_maintenance(range_slider, n_clicks, selected_variables, cur
     existing_traces = set()
 
     # --- Línea principal: CART_penicillin_prediction en eje Y principal ---
-    prediction_var = "CART_penicillin_prediction"
     if prediction_var in df.columns:
         fig.add_trace(go.Scatter(
             x=df["_time"].astype(str),
@@ -281,17 +292,26 @@ def update_graph_var_maintenance(range_slider, n_clicks, selected_variables, cur
 @dash.callback(
     Output("time-slider-labels", "children"),
     Output("time-window-slider", "max"),
+    Input("store-selected-state", "data"),
     Input("time-window-slider", "value"),
     State("maintenance-graph", "figure")
 )
-def update_slider_labels(slider_range, figure):
-    dfc = influxdb_handler.get_data_by_batch_id2("4.0")
+def update_slider_labels(data,slider_range, figure):
+    if not data or "selected_experiment" not in data or not data["selected_experiment"]:
+        print("No experiment ID Selected")
+        return "", 0
+
+    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
     start_idx, end_idx = slider_range
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
         start_time = timestamps[start_idx] if start_idx < len(timestamps) else timestamps[0]
         end_time = timestamps[end_idx] if end_idx < len(timestamps) else timestamps[-1]
-        return f"From: {start_time}  ➡  To: {end_time}", len(timestamps)
+
+        start_str = pd.to_datetime(start_time).strftime('%Y-%m-%d %H:%M:%S')
+        end_str = pd.to_datetime(end_time).strftime('%Y-%m-%d %H:%M:%S')
+
+        return f"From: {start_str}  ➡  To: {end_str}", len(timestamps)
     return "", 0
 
 
@@ -344,28 +364,47 @@ def update_table(add_click, remove_clicks, selected_variable, current_data):
             print("current_data:",current_data)
             print("table:",table)
             return current_data, table
-
 @dash.callback(
     Output("save-confirmation", "children"),
+    Input("model-data-store", "data"),
     Input("confirm-save-btn", "n_clicks"),
     State("prediction-table", "data"),
-    State("comment-input", "value"),
+    State("prediction-table", "selected_rows"),
+    State("dropdown-nivel", "value"),
+    State("dropdown-tipo", "value"),
     prevent_initial_call=True
 )
-def save_table_with_comment(n_clicks, table_data, comment):
-    if not table_data:
-        return "⚠ No data to save."
+def save_selected_row_to_influx(data,n_clicks, table_data, selected_rows, nivel, tipo):
+    # Check if a row is selected
+    if not table_data or not selected_rows:
+        return "⚠ Please select a row first."
+    
+    prediction_var = generate_prediction_name(data["model_name"])
 
-    df = pd.DataFrame(table_data)
-    os.makedirs("data/tables", exist_ok=True)
-
-    # Add a "Comment" column if one is provided
-    if comment:
-        df["Comment"] = comment.strip()
+    row_index = selected_rows[0]
+    row = table_data[row_index]
+    print("Row keys:", list(row.keys()))
+    # Ensure required fields are present
+    if "_time" not in row or prediction_var not in row:
+        return " The selected row does not contain the required fields."
 
     try:
-        filename = "data/tables/table_saved.csv"
-        df.to_csv(filename, index=False)
-        return f"✅ Table saved to '{filename}' with comment included."
+        # Create a point with tags and fields for InfluxDB
+        point = {
+            "measurement": "simulacion_prediccion",
+            "tags": {
+                "nivel": str(nivel),
+                "tipo": str(tipo),
+            },
+            "time": row["_time"],
+            "fields": {
+                "value": float(row[prediction_var]),
+            }
+        }
+
+        # Write the point to InfluxDB
+        influxdb_handler.write_points([point])
+        return f"✅ Point successfully saved to InfluxDB with tags."
     except Exception as e:
-        return f"❌ Error saving the table: {e}"
+        return f" Error saving the point: {e}"
+
