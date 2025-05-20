@@ -1,8 +1,21 @@
 import dash
 from dash import html, dcc, dash_table
 import dash_bootstrap_components as dbc
+from dash_extensions import EventListener
 from utils.utils_global import disabled_figure
 from utils import model_information
+
+style_data_conditional=[
+    {
+        'if': {
+            'column_id': 'Report',
+        },
+        'text-decoration': 'none',
+        'cursor': 'pointer',
+        'fontWeight': 'bold',
+        'margin-bottom': '0px'
+    },
+]
 
 def maintenance_layout():
 
@@ -75,34 +88,37 @@ def maintenance_layout():
 
         # Tabla
         html.Div([
+            
             html.Table(id="variable-table-maintenance", className="table")
         ], className="mt-4"),
 
         # Gráfico
         dcc.Graph(id="maintenance-graph", figure=disabled_figure, className="mt-4"),
-        # Tabla debajo del gráfico
-        dash_table.DataTable(
-            id="prediction-table",
-            columns=[],  # se rellenan dinámicamente
-            data=[],     # también se llena dinámicamente
-            style_table={'overflowX': 'auto'},
-            style_cell={'textAlign': 'left'},
-            row_selectable="single",  # permite seleccionar solo una fila
-            selected_rows=[],
-            page_size=10
+        html.Div(
+            id="anomaly-warning",
+            children=dbc.Label("⚠️ To report an anomaly, click on Report where the row containing an abnormal value. ⚠️", className="mb-3 fw-bold"),
+            style={"display": "none"}  # Oculto por defecto
         ),
+        # Tabla debajo del gráfico
+        # EventListener alrededor de la tabla
+       dash_table.DataTable(
+                    id="prediction-table",
+                    columns=[],  # se rellenan dinámicamente
+                    data=[],     # también se llena dinámicamente
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'textAlign': 'left'},
+                    selected_rows=[],
+                    page_size=10,
+                    markdown_options={"html": True},
+                    style_data_conditional=style_data_conditional
+                    ),
+       
+        dcc.Store(id="clicked-report-info"),
         dcc.Store(id="selected-variables-maintenance", data=[]),
         dbc.Row([
-            dbc.Col(html.Div(id="save-confirmation", className="text-success"),width=12)
+            dbc.Col(html.Div(id="save-confirmation", className="text-success"),width=12),
+            dbc.Col(html.Div(id="save-confirmation2", className="text-success"),width=12)
         ], className="mt-4"),
-        # Botones de acción
-        dbc.Row([
-            dbc.Col(dbc.Button("Save Simulation", id="save-table-btn", color="success", className="w-100"), width=12)
-            #dbc.Col(dbc.Button("Set Maintenance", id="maintain-model", color="danger", className="w-100"), width=6)
-        ], className="mt-4"),
-
-        # Componente de descarga
-        dcc.Download(id="download-excel"),
 
         # Modal: Save simulation
         dbc.Modal([

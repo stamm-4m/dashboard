@@ -10,3 +10,4 @@ dash-bootstrap-components
 datetime
 scikit-learn
 python-dotenv
+dash-extensions

@@ -2,6 +2,7 @@ from config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BA
 from db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
 from influxdb_client import Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
+from datetime import datetime
 
 import pandas as pd
 import logging
@@ -525,13 +526,35 @@ class InfluxDBServices:
         return list(set(experiment_ids))
 
     def write_points(self, points):
-        with self.client.write_api(write_options=SYNCHRONOUS) as write_api:
+        with self.connector.client.write_api(write_options=SYNCHRONOUS) as write_api:
             for p in points:
-                point = (
-                    Point(p["measurement"])
-                    .tag("nivel", p["tags"]["level"])
-                    .tag("tipo", p["tags"]["type"])
-                    .field("value", p["fields"]["value"])
-                    .time(p["time"], WritePrecision.NS)
-                )
-                write_api.write(bucket=self.bucket, org=self.org, record=point)
+                point = Point(p["measurement"])
+
+                # Add tags if present
+                if "tags" in p:
+                    for tag_key, tag_value in p["tags"].items():
+                        point = point.tag(tag_key, tag_value)
+
+                # Add fields if present
+                if "fields" in p:
+                    for field_key, field_value in p["fields"].items():
+                        point = point.field(field_key, field_value)
+                else:
+                    print("❌ No fields provided. Point will not be written.")
+                    continue  # Skip this point if it has no fields
+
+                # Add timestamp if defined
+                if "time" in p:
+                    time_value = p["time"]
+                    try:
+                        if isinstance(time_value, str):
+                            # Attempt to parse custom date format: MM/DD/YYYY HH:MM:SS
+                            dt = datetime.strptime(time_value, '%m/%d/%Y %H:%M:%S')
+                            time_value = dt
+                        point = point.time(time_value, WritePrecision.NS)
+                    except ValueError as ve:
+                        print(f"❌ Invalid date format: {time_value}. Error: {ve}")
+                        continue  # Skip point if time is invalid
+
+                print("✅ Writing point:", point.to_line_protocol())
+                write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)

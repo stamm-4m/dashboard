@@ -1,5 +1,7 @@
 import os
-from dash import Input, Output, State, dcc, ALL, ctx, html
+from dash import Input, Output, State, dcc, ALL, ctx, html,no_update
+from dash import callback_context
+
 import dash_bootstrap_components as dbc
 import dash
 import pandas as pd
@@ -33,51 +35,6 @@ def update_experiment_display(data):
                 return "No experiment ID Selected"
             return f"{data['selected_experiment']}"
  
-# Save modal
-@dash.callback(
-    Output("save-modal", "is_open"),
-    Input("save-table-btn", "n_clicks"),
-    Input("cancel-save-btn", "n_clicks"),
-    Input("confirm-save-btn", "n_clicks"),
-    State("save-modal", "is_open"),
-    prevent_initial_call=True
-)
-def toggle_save_modal(open_click, cancel_click, confirm_click, is_open):
-    ctx_trigger = ctx.triggered_id
-    if ctx_trigger == "save-table-btn":
-        return True  # Abrir modal
-    elif ctx_trigger in ["cancel-save-btn", "confirm-save-btn"]:
-        return False  # Cerrar modal
-    return is_open
-
-# Download Excel
-@dash.callback(
-        Output("download-excel", "data"),
-        Input("confirm-save", "n_clicks"),
-        State("variable-table-maintenance", "data"),
-        prevent_initial_call=True
-    )
-def save_simulation(n_clicks, data):
-        if not data:
-            return None
-
-        df = pd.DataFrame(data)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Simulations")
-        output.seek(0)
-
-        return dcc.send_bytes(output.getvalue(), "simulation_data.xlsx")
-
-# Maintain modal
-@dash.callback(
-        Output("maintain-modal", "is_open"),
-        [Input("maintain-model", "n_clicks"), Input("cancel-maintain", "n_clicks")],
-        [State("maintain-modal", "is_open")],
-        prevent_initial_call=True
-    )
-def toggle_maintain_modal(maintain_click, cancel_click, is_open):
-        return not is_open
 
 # Confirm maintenance
 @dash.callback(
@@ -176,16 +133,23 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
     if prediction_var in table_df.columns:
         table_df[prediction_var] = table_df[prediction_var].round(4)
 
-    # Preparar tabla
+    # Agregar columna "Reportar"
+    table_df["Report"] = [
+        f"[🚨 Report](#report-{i})" for i in range(len(table_df))
+    ]
+    
+    # Preparar tabla con markdown
     table_data = table_df.to_dict("records")
     table_columns = [
-    {
-        "name": col,
-        "id": col,
-        "editable": col == prediction_var  # Solo editable si es la columna de predicción
-    }
-    for col in table_df.columns
-]
+        {"name": col, "id": col} for col in table_df.columns if col != "Report"
+    ]
+    table_columns.append({
+        "name": "Anomaly",
+        "id": "Report",
+        "presentation": "markdown"
+    })
+
+
 
     print(f"🔄 Callback executed - Clicks: {n_clicks}, Selected variables: {selected_variables}")
 
@@ -364,47 +328,99 @@ def update_table(add_click, remove_clicks, selected_variable, current_data):
             print("current_data:",current_data)
             print("table:",table)
             return current_data, table
+
 @dash.callback(
     Output("save-confirmation", "children"),
+    Input("store-selected-state", "data"),
     Input("model-data-store", "data"),
     Input("confirm-save-btn", "n_clicks"),
     State("prediction-table", "data"),
-    State("prediction-table", "selected_rows"),
+    State("clicked-report-info", "data"),
     State("dropdown-nivel", "value"),
     State("dropdown-tipo", "value"),
     prevent_initial_call=True
 )
-def save_selected_row_to_influx(data,n_clicks, table_data, selected_rows, nivel, tipo):
+def save_selected_row_to_influx(data_exp, data, n_clicks, table_data, row_data, nivel, tipo):
     # Check if a row is selected
-    if not table_data or not selected_rows:
-        return "⚠ Please select a row first."
-    
-    prediction_var = generate_prediction_name(data["model_name"])
+    #if not table_data or row_index is None or row_index >= len(table_data):
+    #    return "⚠ Please select a row by clicking on it."
 
-    row_index = selected_rows[0]
-    row = table_data[row_index]
-    print("Row keys:", list(row.keys()))
-    # Ensure required fields are present
+    prediction_var = generate_prediction_name(data["model_name"])
+    row = row_data
+    
+    # Ensure the required fields are present
     if "_time" not in row or prediction_var not in row:
-        return " The selected row does not contain the required fields."
+        return "❌ The selected row does not contain the required fields."
 
     try:
-        # Create a point with tags and fields for InfluxDB
+        value = row[prediction_var]
+        if value is None or value == "":
+            return "⚠ The prediction value is empty."
+
+        # New point with the same data but with additional tags
         point = {
-            "measurement": "simulacion_prediccion",
+            "measurement": str(data_exp["selected_experiment"]),
             "tags": {
-                "nivel": str(nivel),
-                "tipo": str(tipo),
+                "level": str(nivel),
+                "type": str(tipo),
             },
             "time": row["_time"],
             "fields": {
-                "value": float(row[prediction_var]),
+                prediction_var: float(value)
             }
         }
 
-        # Write the point to InfluxDB
         influxdb_handler.write_points([point])
-        return f"✅ Point successfully saved to InfluxDB with tags."
+        return "✅ Point duplicated and updated with new tags in InfluxDB."
     except Exception as e:
-        return f" Error saving the point: {e}"
+        return f"❌ Error saving the point to InfluxDB: {e}"
+    
+@dash.callback(
+    Output("anomaly-warning", "style"),
+    Input("prediction-table", "data")
+)
+def toggle_anomaly_warning(table_data):
+    if table_data and len(table_data) > 0:
+        return {"display": "block"}
+    return {"display": "none"}
 
+@dash.callback(
+    Output("save-modal", "is_open", allow_duplicate=True),
+    Input("confirm-save-btn", "n_clicks"),
+    Input("cancel-save-btn", "n_clicks"),
+    State("clicked-report-info", "data"),
+    prevent_initial_call=True
+)
+def process_report(confirm_clicks, cancel_clicks, report_data):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        return dash.no_update
+
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if trigger_id == "cancel-save-btn":
+        return False  # Close the modal without doing anything
+
+    if trigger_id == "confirm-save-btn":
+        # Here you could save the anomaly to a database or log
+        print(f"✅ Anomaly reported at: {report_data}")
+        # TODO: save or send the data
+        return False  # Close the modal
+
+    return dash.no_update
+
+@dash.callback(
+    Output("save-modal", "is_open"),
+    Output("clicked-report-info", "data"),
+    Input("prediction-table", "active_cell"),
+    State("prediction-table", "data"),
+    prevent_initial_call=True
+)
+def handle_report_click(active_cell, table_data):
+    if active_cell and active_cell.get("column_id") == "Report":
+        row_idx = active_cell["row"]
+        row_data = table_data[row_idx]
+        return True, row_data  # open modal with data
+
+    return False, dash.no_update
