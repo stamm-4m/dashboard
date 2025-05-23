@@ -558,3 +558,87 @@ class InfluxDBServices:
 
                 print("✅ Writing point:", point.to_line_protocol())
                 write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)
+    
+    def get_count_data_experiment_ids(self, bucket_name: str, time_range="-90d"):
+        """
+        Retrieves a DataFrame with experiment_IDs and their count from the specified bucket in InfluxDB.
+
+        Args:
+            bucket_name (str): Name of the InfluxDB bucket to query.
+            time_range (str): Time range for the query (default is "-90d").
+
+        Returns:
+            pd.DataFrame: A DataFrame with two columns:
+                        - 'experiment_id': the unique ID of each experiment
+                        - 'num_points': the number of data points associated with each experiment_id
+        """
+        try:
+            # Build the Flux query to retrieve all experiment_id values
+            query = f"""
+            from(bucket: "{bucket_name}")
+            |> range(start: {time_range})
+            |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Ensure experiment_id field exists
+            |> keep(columns: ["{str(BACH_ID)}"])              // Keep only the experiment_id column
+            """
+
+            # Execute the query
+            result = self.connector.query_api.query(org=self.connector.org, query=query)
+
+            # Extract experiment_id values from query results
+            experiment_ids = [
+                record.values.get(str(BACH_ID))                # Access the value of the experiment_id field
+                for table in result
+                for record in table.records
+                if str(BACH_ID) in record.values               # Ensure the field is present
+            ]
+
+            # Convert the list of IDs to a DataFrame
+            df = pd.DataFrame(experiment_ids, columns=['experiment_id'])
+
+            # Count the occurrences of each experiment_id
+            count_df = df['experiment_id'].value_counts().reset_index()
+            count_df.columns = ['experiment_id', 'num_points']  # Rename columns to match expected format
+
+            return count_df
+
+        except Exception as e:
+            # Handle any unexpected error and return empty DataFrame
+            print(f"Error retrieving experiment_ID from bucket '{bucket_name}': {e}")
+            return pd.DataFrame(columns=['experiment_id', 'num_points'])
+
+    def get_data_experiment_id(self, experiment_id: str, minutes: int = 5) -> pd.DataFrame:
+        """
+        Retrieves data for a specific experiment_id from InfluxDB in the last N minutes.
+
+        Args:
+            experiment_id (str): The experiment_id to filter.
+            minutes (int): Time window in minutes to look back.
+
+        Returns:
+            pd.DataFrame: A DataFrame with the data for the given experiment_id.
+        """
+        try:
+            # Build Flux query
+            query = f'''
+            from(bucket: "{self.connector.bucket}")
+            |> range(start: -{minutes}m)
+            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_id}")
+            |> limit(n: 1)  // Stop early as we only need to check for existence
+            '''
+
+            result = self.connector.query_api.query(org=self.connector.org, query=query)
+
+            # Parse result into a DataFrame
+            records = [
+                record.values
+                for table in result
+                for record in table.records
+            ]
+
+            df = pd.DataFrame(records)
+            return df
+
+        except Exception as e:
+            print(f"[Error] get_data_experiment_id('{experiment_id}', {minutes}): {e}")
+            return pd.DataFrame()
+

@@ -6,6 +6,9 @@ from dash.exceptions import PreventUpdate
 from utils import model_information
 from InfluxDb import influxdb_handler  # Retrieve the created instance
 from utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
+import plotly.express as px
+import pandas as pd
+
 
 @dash.callback(
     Output("store-selected-state", "data"),
@@ -32,26 +35,20 @@ def sync_experiment_selection(experiment_id, store_data):
 @dash.callback(
     [Output("bucket-dropdown", "options"),
     Output("experiment-dropdown", "options")],
-    [Input("real-time-radio", "value"),
-    Input("bucket-dropdown", "value")]
+    [Input("bucket-dropdown", "value")]
 )
-def update_dropdowns(selected_option, selected_bucket):
+def update_dropdowns(selected_bucket):
     """Updates the dropdown options based on ONLINE/OFFLINE state."""
     try:
         bucket_options = [{"label": b, "value": b} for b in influxdb_handler.get_buckets()]
         experiment_options = []
         if selected_bucket:
             # Solo obtener experimentos con datos en los últimos 5 minutos
-            exp_recent = influxdb_handler.get_recent_experiment_ids(selected_bucket, minutes=5)
+            #exp_recent = influxdb_handler.get_recent_experiment_ids(selected_bucket, minutes=5)
             # Obtener todos los experimentos sin importar la fecha
             exp_all = influxdb_handler.get_distinct_experiment_ids(selected_bucket)
-            if selected_option == "ON":
-                experiments = exp_recent
-            else:
-                experiments = [item for item in exp_all if item not in exp_recent]
-                        
-            print(experiments)
-            experiment_options = [{"label": exp, "value": exp} for exp in experiments]
+            print("Experiments ID: ",exp_all)
+            experiment_options = [{"label": exp, "value": exp} for exp in exp_all]
 
         return bucket_options, experiment_options
     except Exception as e:
@@ -122,13 +119,38 @@ def update_table_data(bucket, experiment_id):
 
 @dash.callback(
     [Output("offline-link", "disabled"),
-    Output("online-link", "disabled")],
-    [Input("real-time-radio", "value")]
+     Output("online-link", "disabled")],
+    Input("experiment-dropdown", "value")
 )
-def toggle_links(real_time_value):
-    if real_time_value == "ON":
-        return True, False
-    return False, True
+def toggle_links(experiment_selected):
+    """
+    Enable or disable the 'Online' and 'Offline' links based on whether the selected experiment
+    has received data within the last 5 minutes.
+
+    Args:
+        experiment_selected (str): The selected experiment ID from the dropdown.
+
+    Returns:
+        (bool, bool): Tuple to set the 'disabled' state of 'offline-link' and 'online-link'.
+    """
+    if not experiment_selected:
+        # No experiment selected; enable offline by default
+        return False, True
+
+    try:
+        df = influxdb_handler.get_data_experiment_id(experiment_selected, minutes=5)
+
+        if df.shape[0] > 0:
+            # Recent data found → enable 'online', disable 'offline'
+            return True, False
+
+        # No recent data → enable 'offline', disable 'online'
+        return False, True
+
+    except Exception as e:
+        print(f"[Error] toggle_links: {e}")
+        # In case of error, enable offline by default
+        return False, True
 
 @dash.callback(
             Output('project-details', 'children'),
@@ -145,4 +167,42 @@ def display_project_details(value):
         return generate_projects_details_view(data)
     else:
         return html.P("The information project not found.")
+    
+@dash.callback(
+    Output('histogram_experiments', 'figure'),
+    Output('prev_experiment_ids', 'data'),
+    Input('interval-component', 'n_intervals'),
+    Input('bucket-dropdown', 'value'),
+    State('prev_experiment_ids', 'data'),
+)
+def update_histogram(n, bucket, prev_ids):
+    if bucket is None:
+        return px.bar(title="Please select a bucket to display data"), prev_ids
 
+    count_df = influxdb_handler.get_count_data_experiment_ids(bucket)
+
+    if count_df.empty:
+        return px.bar(title="No experiments found for the selected bucket"), prev_ids
+
+    current_ids = count_df['experiment_id'].tolist()
+    new_ids = list(set(current_ids) - set(prev_ids))
+
+
+    # Assign colors: highlight new IDs
+    color_map = {
+        eid: '#FF5733' if eid in new_ids else '#4682B4'
+        for eid in current_ids
+    }
+
+    fig = px.bar(
+        count_df,
+        x='experiment_id',
+        y='num_points',
+        labels={'experiment_id': 'Experiment ID', 'num_points': 'Number of Points'},
+        title=f'Number of Data Points per Experiment ID in Bucket "{bucket}"',
+        color='experiment_id',
+        color_discrete_map=color_map
+    )
+    fig.update_layout(showlegend=False)  # optional: hide legend
+
+    return fig, current_ids

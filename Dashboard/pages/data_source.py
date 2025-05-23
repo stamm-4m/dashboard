@@ -16,16 +16,7 @@ def data_source_layout():
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.H3("Data:", className="fw-bold d-inline"),
-                        dbc.RadioItems(
-                            id="real-time-radio",
-                            options=[{"label": "ONLINE", "value": "ON"}, {"label": "OFFLINE", "value": "OFF"}],
-                            value="OFF",
-                            persistence=True,
-                            persistence_type="local",
-                            inline=True,
-                            className="ms-3"
-                        )
+                        html.H3("Data source", className="fw-bold d-inline")
                     ], className="d-flex align-items-center mb-3"),
 
                     dbc.Label("Bucket:", className="fw-bold"),
@@ -53,13 +44,21 @@ def data_source_layout():
                         
                     ),
                 ], width=5, className="p-3 bg-light rounded-3 shadow-sm"),
-
+                
                 dbc.Col([
+                    dcc.Graph(id='histogram_experiments', figure=disabled_figure),
+                    dcc.Store(id='prev_experiment_ids', data=[]),
+                    dcc.Interval(
+                        id='interval-component',
+                        interval=5 * 1000,  # 5 segundos
+                        n_intervals=0
+                    ),
                     dcc.Graph(id="bar-chart", figure=disabled_figure)
                 ], width=7, className="shadow-sm")
             ], className="my-4"),
 
             dbc.Row([
+                    
                 html.Div("Duration: N/A", id="duration-text", className="fw-bold text-primary fs-5 mb-3")
             ]),
 
