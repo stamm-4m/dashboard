@@ -74,3 +74,6 @@
     color: white;
     text-decoration: none;
 }
+.dash-spreadsheet-menu {
+    display: none !important;
+}

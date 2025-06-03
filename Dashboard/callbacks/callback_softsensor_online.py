@@ -170,6 +170,7 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,n
 
                 if predicted_values is None:
                     print(f"⚠️ Not data out index inicio_pred:  {inicio_pred}.")
+                    inicio_pred += 1
                     return dash.no_update, data_prediction
                 
                 print(f"name_prediction: {name_prediction}")  # Verify predictions

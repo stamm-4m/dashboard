@@ -21,8 +21,7 @@ def maintenance_layout():
 
     # Load model options dynamically for layout
     model_options = model_information.get_model_name_options()
-    print("model_options view:",model_options)
-
+    
     # Return only the content specific to the maintenance page
     return html.Div([
             html.H3("Simulation Assessment", className="mb-4"),
@@ -107,10 +106,13 @@ def maintenance_layout():
                     data=[],     # también se llena dinámicamente
                     style_table={'overflowX': 'auto'},
                     style_cell={'textAlign': 'left'},
-                    selected_rows=[],
+                    hidden_columns=["raw_time", "raw_prediction"],
                     page_size=10,
                     markdown_options={"html": True},
-                    style_data_conditional=style_data_conditional
+                    style_data_conditional=style_data_conditional,
+                    editable=False,
+                    column_selectable=False
+                    
                     ),
        
         dcc.Store(id="clicked-report-info"),

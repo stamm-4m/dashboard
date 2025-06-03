@@ -102,7 +102,6 @@ def update_table_data(bucket, experiment_id):
 
     try:
         raw_data = influxdb_handler.get_data_for_table(bucket, experiment_id)
-        
         # Ensure variable names exist and categorize them
         processed_data = []
         for row in raw_data:
@@ -175,23 +174,29 @@ def display_project_details(value):
     Input('bucket-dropdown', 'value'),
     State('prev_experiment_ids', 'data'),
 )
-def update_histogram(n, bucket, prev_ids):
+def update_histogram(n, bucket, prev_data):
     if bucket is None:
-        return px.bar(title="Please select a bucket to display data"), prev_ids
+        return px.bar(title="Please select a bucket to display data"), prev_data
 
     count_df = influxdb_handler.get_count_data_experiment_ids(bucket)
 
     if count_df.empty:
-        return px.bar(title="No experiments found for the selected bucket"), prev_ids
+        return px.bar(title="No experiments found for the selected bucket"), prev_data
 
-    current_ids = count_df['experiment_id'].tolist()
-    new_ids = list(set(current_ids) - set(prev_ids))
+    # Convert previous data to dict if exists, otherwise empty
+    prev_data = prev_data or {}
+    
+    current_data = dict(zip(count_df['experiment_id'], count_df['num_points']))
+    changed_ids = []
 
+    for eid, count in current_data.items():
+        if eid not in prev_data or count > prev_data[eid]:
+            changed_ids.append(eid)
 
-    # Assign colors: highlight new IDs
+    # Color map: changed = naranja, igual = azul
     color_map = {
-        eid: '#FF5733' if eid in new_ids else '#4682B4'
-        for eid in current_ids
+        eid: '#FF5733' if eid in changed_ids else '#4682B4'
+        for eid in current_data.keys()
     }
 
     fig = px.bar(
@@ -203,6 +208,6 @@ def update_histogram(n, bucket, prev_ids):
         color='experiment_id',
         color_discrete_map=color_map
     )
-    fig.update_layout(showlegend=False)  # optional: hide legend
+    fig.update_layout(showlegend=False)
 
-    return fig, current_ids
+    return fig, current_data  # <-- Guarda el nuevo estado con conteo

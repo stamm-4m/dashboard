@@ -9,7 +9,7 @@ import numpy as np
 import plotly.graph_objects as go
 from InfluxDb import influxdb_handler # retrieve the created instance
 import io
-from utils import model_information
+from utils import model_information,sqlite_handler
 import plotly.express as px
 from utils.utils_maintenance import generate_prediction_name
 
@@ -104,15 +104,18 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
         return go.Figure(), [],[]
     
     dfc = influxdb_handler.get_data_by_batch_id2(data_exp["selected_experiment"])
+    print("dfc: ",dfc)
     dfc["_time"] = pd.to_datetime(dfc["_time"], errors="coerce")
+
     timestamps = sorted(dfc["_time"].dropna().unique())
     start_time = timestamps[range_slider[0]]
     end_time = timestamps[range_slider[1]]
     dfc = dfc[(dfc["_time"] >= start_time) & (dfc["_time"] <= end_time)]
-    print('data["model_name"]: ',data["model_name"])
+    
     if not data or "model_name" not in data or not data["model_name"]:
         print("no data model name")
         return go.Figure(),[],[]
+    
     prediction_var = generate_prediction_name(data["model_name"])
     #data for table section
     # Columnas base
@@ -128,27 +131,38 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
 
     # Filtrar el DataFrame
     table_df = dfc[columns_to_show].dropna(subset=[prediction_var])
-    # Formato fecha y predicción
-    table_df["_time"] = table_df["_time"].dt.strftime('%m/%d/%Y %H:%M:%S')
+
+    # Guardar columnas originales sin formato
+    table_df["raw_time"] = table_df["_time"]
     if prediction_var in table_df.columns:
-        table_df[prediction_var] = table_df[prediction_var].round(4)
+        table_df["raw_prediction"] = table_df[prediction_var]
+
+    # Formato fecha y predicción
+    table_df["time_str"] = table_df["_time"].dt.strftime('%m/%d/%Y %H:%M:%S.%f')
+    if prediction_var in table_df.columns:
+        table_df[prediction_var+"_str"] = table_df[prediction_var].round(4)
 
     # Agregar columna "Reportar"
     table_df["Report"] = [
         f"[🚨 Report](#report-{i})" for i in range(len(table_df))
     ]
     
+    # Para mostrar en la tabla: eliminamos _time original y renombramos time_str a _time
+    table_for_dash = table_df.drop(columns=["_time"]).rename(columns={"time_str": "_time"})
+    table_for_dash = table_for_dash.drop(columns=[prediction_var]).rename(columns={prediction_var+"_str": prediction_var})
+
     # Preparar tabla con markdown
-    table_data = table_df.to_dict("records")
+    table_data = table_for_dash.to_dict("records")
+    # Columnas visibles
     table_columns = [
-        {"name": col, "id": col} for col in table_df.columns if col != "Report"
+        {"name": col, "id": col} for col in table_for_dash.columns if col not in ["Report", "raw_time", "raw_prediction"]
     ]
     table_columns.append({
         "name": "Anomaly",
         "id": "Report",
         "presentation": "markdown"
     })
-
+    hidden_columns = ["raw_time", "raw_prediction"]
 
 
     print(f"🔄 Callback executed - Clicks: {n_clicks}, Selected variables: {selected_variables}")
@@ -345,15 +359,16 @@ def save_selected_row_to_influx(data_exp, data, n_clicks, table_data, row_data, 
     #if not table_data or row_index is None or row_index >= len(table_data):
     #    return "⚠ Please select a row by clicking on it."
 
-    prediction_var = generate_prediction_name(data["model_name"])
+    prediction_var = generate_prediction_name(data["model_file"])
     row = row_data
-    
+    print(prediction_var)
     # Ensure the required fields are present
-    if "_time" not in row or prediction_var not in row:
+    if "raw_time" not in row:
         return "❌ The selected row does not contain the required fields."
 
     try:
-        value = row[prediction_var]
+        # to save point Local file
+        value = row["raw_prediction"]
         if value is None or value == "":
             return "⚠ The prediction value is empty."
 
@@ -364,14 +379,21 @@ def save_selected_row_to_influx(data_exp, data, n_clicks, table_data, row_data, 
                 "level": str(nivel),
                 "type": str(tipo),
             },
-            "time": row["_time"],
+            "time": row["raw_time"],
             "fields": {
                 prediction_var: float(value)
             }
         }
-
-        influxdb_handler.write_points([point])
-        return "✅ Point duplicated and updated with new tags in InfluxDB."
+        # NO update influx data
+        #influxdb_handler.update_point_tags_safe(data_exp["selected_experiment"],row["raw_time"],prediction_var,float(value),{"type": str(tipo), "level": str(nivel)})
+        sqlite_handler.upsert_point(
+            data_exp["selected_experiment"],
+            row["raw_time"],
+            prediction_var,
+            float(value),
+            {"type": str(tipo), "level": str(nivel)}
+        )
+        return "✅ Point saved with tags in SQLite."
     except Exception as e:
         return f"❌ Error saving the point to InfluxDB: {e}"
     
@@ -421,6 +443,7 @@ def handle_report_click(active_cell, table_data):
     if active_cell and active_cell.get("column_id") == "Report":
         row_idx = active_cell["row"]
         row_data = table_data[row_idx]
+        print("row_data",row_data)
         return True, row_data  # open modal with data
 
     return False, dash.no_update

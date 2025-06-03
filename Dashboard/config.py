@@ -16,8 +16,9 @@ INFLUXDB_TOKEN = check_env_var("INFLUXDB_TOKEN")
 INFLUXDB_ORG = check_env_var("INFLUXDB_ORG")
 INFLUXDB_BUCKET = check_env_var("INFLUXDB_BUCKET")
 
-# Optional variables
+
 BACH_ID = os.getenv("BACH_ID")
+DB_SQLITE_DIR = os.getenv("DB_SQLITE_DIR")
 
 # Local InfluxDB connection variables (optional, but you can validate them if needed)
 INFLUXDB_URL_LOCAL = os.getenv("INFLUXDB_URL_LOCAL")

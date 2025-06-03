@@ -47,7 +47,7 @@ def data_source_layout():
                 
                 dbc.Col([
                     dcc.Graph(id='histogram_experiments', figure=disabled_figure),
-                    dcc.Store(id='prev_experiment_ids', data=[]),
+                    dcc.Store(id='prev_experiment_ids', data={}),
                     dcc.Interval(
                         id='interval-component',
                         interval=5 * 1000,  # 5 segundos
