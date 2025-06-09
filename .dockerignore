@@ -1,0 +1,36 @@
+# Ignore Python cache files and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore environment files
+.env
+
+# Ignore Git repository and Git metadata
+.git
+.gitignore
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore Poetry virtual environments (if created locally)
+# Useful if you ever use 'poetry config virtualenvs.in-project true'
+# .venv/
+.env312/
+
+# Ignore Jupyter Notebook checkpoints (if any)
+.ipynb_checkpoints/
+
+# Ignore editor-specific files
+.vscode/
+.idea/
+
+# Optional: ignore log files
+*.log
+
+# Optional: ignore test results or coverage reports
+htmlcov/
+coverage.xml
+*.cover
+.cache/

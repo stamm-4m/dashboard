@@ -3,6 +3,7 @@ name = "Dashboard"
 version = "0.0.1"
 description = "Soft Sensor Monitoring and Maintenance Framework for Machine Learning Models"
 authors = [
+    "Carlos Alberto Suarez Muñoz <csuarez@unicauca.edu.co>",
     "David Camilo Corrales <David-Camilo.Corrales-Munoz@inrae.fr>"
 ]
 license = "Apache-2.0"
@@ -12,7 +13,7 @@ homepage = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-
 documentation = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
 
 include = [
-    "Dashboard/**",
+    "Dashboard/**"
 ]
 
 [tool.poetry.dependencies]
@@ -25,6 +26,7 @@ PyYAML = "*"
 numpy = "*"
 joblib = "*"
 dash-bootstrap-components = "*"
+dash-extensions = "*"
 scikit-learn = "*"
 python-dotenv = "*"
 tensorflow = "2.14.0"
@@ -39,11 +41,9 @@ pytest = "^8.3.4"
 coverage = "^7.6.8"
 mypy = "0.991"
 
-
 [tool.poetry.group.dev.dependencies]
 bump2version = "^1.0.1"
 pylint = "^3.3.4"
-
 
 [build-system]
 requires = ["poetry-core"]
