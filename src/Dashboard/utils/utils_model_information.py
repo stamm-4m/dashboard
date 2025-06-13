@@ -6,7 +6,7 @@ from Dashboard.config import BASE_URL_API
 from Dashboard.utils.utils_apiclient import ApiClient
 from io import StringIO
 from Dashboard.drift_detectors_pack.drift_detectors.utility import  metadata
-from Dashboard.drift_detectors_pack.drift_detectors.model_disagreement import DisagreementMetricLoader
+from Dashboard.drift_detectors_pack.drift_detectors import DisagreementMetricLoader
 
 
 

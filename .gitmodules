@@ -1,0 +1,6 @@
+[submodule "src/Dashboard/drift_detectors_pack"]
+	path = src/Dashboard/drift_detectors_pack
+	url = git@gitlab.com:stamm-4m/drift_detectors_pack.git
+[submodule "src/Dashboard/db_connector"]
+	path = src/Dashboard/db_connector
+	url = git@gitlab.com:stamm-4m/db_connector.git

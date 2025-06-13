@@ -24,7 +24,10 @@ joblib = "*"
 dash-bootstrap-components = "*"
 dash-extensions = "*"
 python-dotenv = "*"
-scipy = "^1.15.3"
+scipy = "1.15.2"
+stamm-drift-detectors = { path = "src/Dashboard/drift_detectors_pack", develop = true }
+multi-db-connector = { path = "src/Dashboard/db_connector", develop = true }
+
 
 [tool.poetry.scripts]
 stamm = "Dashboard.app:main"
