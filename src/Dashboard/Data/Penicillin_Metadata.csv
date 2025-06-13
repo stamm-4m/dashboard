@@ -1,0 +1,33 @@
+﻿Variable_name,Column_type,Units,Variable_name_InfluxDB
+Time (h),Time,Hour,experiment_time
+Aeration rate(Fg:L/h),Actuator,Fg:L/h,aeration_rate
+Agitator RPM(RPM:RPM),Actuator,RPM,agitator
+Sugar feed rate(Fs:L/h),Actuator,L/h,sugar_feed_rate
+Acid flow rate(Fa:L/h),Actuator,L/h,acid_flow_rate
+Base flow rate(Fb:L/h),Actuator,L/h,base_flow_rate
+Heating/cooling water flow rate(Fc:L/h),Actuator,L/h,heating/cooling_water_flow_rate
+Heating water flow rate(Fh:L/h),Actuator,L/h,heating_water_flow_rate
+Water for injection/dilution(Fw:L/h),Actuator,L/h,water_for_injection/dilution
+Air head pressure(pressure:bar),Sensor,bar,air_head_pressure
+Dumped broth flow(Fremoved:L/h),Actuator,L/h,dumped_broth_flow
+Substrate concentration(S:g/L),Actuator,g/L,substrate_concentration
+Dissolved oxygen concentration(DO2:mg/L),Sensor,mg/L,dissolved_oxygen_concentration
+Penicillin concentration(P:g/L),Soft_sensor,g/L,penicillin_concentration
+Vessel Volume(V:L),Computed_variable,L,vessel_volume
+Vessel Weight(Wt:Kg),Computed_variable,Kg,vessel_weight
+pH(pH:pH),Sensor,pH,pH
+Temperature(T:K),Sensor,Kelvin,temperature
+Generated heat(Q:kJ),Sensor,kJ,generated_heat
+carbon dioxide percent in off-gas(CO2outgas:%),Sensor,%,CO2_percent_in_off_gas
+PAA flow(Fpaa:PAA flow (L/h)),Actuator,L/h,PAA_flow
+PAA concentration offline(PAA_offline:PAA (g L^{-1})),Offline_measurement,g L^{-1},PAA_concentration
+Oil flow(Foil:L/hr),Actuator,L/h,oil_flow
+NH_3 concentration off-line(NH3_offline:NH3 (g L^{-1})),Offline_measurement,g L^{-1},NH3_concentration 
+Oxygen Uptake Rate(OUR:(g min^{-1})),Sensor,g min^{-1},oxygen_uptake_rate
+Oxygen in percent in off-gas(O2:O2  (%)),Sensor,%,oxygen_in_percent_in_off_gas
+Offline Penicillin concentration(P_offline:P(g L^{-1})),Offline_measurement,g L^{-1},offline_penicillin_concentration
+Offline Biomass concentratio(X_offline:X(g L^{-1})),Offline_measurement,g L^{-1},offline_biomass_concentration
+Carbon evolution rate(CER:g/h),Sensor,g/h,carbon_evolution_rate
+Ammonia shots(NH3_shots:kgs),Actuator,kgs,ammonia_shots
+Viscosity(Viscosity_offline:centPoise),Offline_measurement,centPoise,viscosity
+Batch ID,Experiment,-,experiment_ID

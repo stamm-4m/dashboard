@@ -1,0 +1,79 @@
+/* Barra lateral */
+.sidebar {
+    background-color: #2d3e50;
+    padding: 20px;
+    width: 20%;
+    position: fixed;
+    height: 100%;
+    color: white;
+}
+
+.sidebar-title {
+    color: #ffffff;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.sidebar-link {
+    color: #ffffff;
+    display: block;
+    padding: 10px;
+    text-decoration: none;
+}
+
+.sidebar-link:hover {
+    background-color: #1a252f;
+    border-radius: 5px;
+}
+
+/* Contenido principal */
+.content {
+    margin-left: 22%;
+    padding: 20px;
+}
+.sidebar-link.active {
+    color: white;
+    background-color: #0d6efd; /* Azul Bootstrap */
+    font-weight: bold;
+}
+/* Estilo numeros bar nav*/
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    font-size: 16px;
+    text-decoration: none;
+    color: white;
+}
+
+.sidebar-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    text-decoration: none;
+}
+
+.nav-item-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.circle-number {
+    background-color: #2d3e50; /* Fondo del número */
+    color: white;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.nav-text {
+    color: white;
+    text-decoration: none;
+}
+.dash-spreadsheet-menu {
+    display: none !important;
+}
