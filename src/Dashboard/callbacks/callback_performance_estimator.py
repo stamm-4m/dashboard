@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 import re
 
-from InfluxDb import influxdb_handler
-from utils import model_information
-from utils.utils_performance_estimator import get_next_color,reload_models
-from utils.utils_global import disabled_figure, generate_prediction_name
-from drift_detectors.model_disagreement import DisagreementMetricLoader
+from Dashboard.InfluxDb import influxdb_handler
+from Dashboard.utils import model_information
+from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models
+from Dashboard.utils.utils_global import disabled_figure, generate_prediction_name
+#from drift_detectors_pack.drift_detectors.drift_detector import DisagreementMetricLoader
 
         # Function to update the options of the existing models
 @dash.callback(
@@ -253,9 +253,10 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
                 "CV"
             }
             
-            loader = DisagreementMetricLoader()
-            metric = loader.get_metric(selected_metric)
-            value = metric.compute(y_true,y_pred)
+            #loader = DisagreementMetricLoader()
+            #metric = loader.get_metric(selected_metric)
+            #value = metric.compute(y_true,y_pred)
+            value = 0.0
             if selected_metric in pointwise_metrics:
                 # nothing
                 metric_values = value

@@ -1,22 +1,28 @@
 import dash
 from dash import Input, Output, html, State
-from ..pages.data_source import data_source_layout
-from ..pages.softsensor_offline import sofsensor_offline_layout
-from ..pages.softsensor_online import softsensor_online_layout
-from ..pages.data_drift import data_drift_layout
-from ..pages.model_upload import model_upload_layout
-from ..pages.performance_estimator import performance_estimator_layout
-from ..pages.help import help_layout
-from ..pages.about_us import about_us_layout
-from ..pages.not_found import not_found_layout
-from ..pages.home import home_layout
-from ..pages.maintenance import maintenance_layout
+from Dashboard.layouts.auth_layout import login_form 
+from Dashboard.layouts.main_layout import layout 
+from Dashboard.pages.data_source import data_source_layout
+from Dashboard.pages.softsensor_offline import sofsensor_offline_layout
+from Dashboard.pages.softsensor_online import softsensor_online_layout
+from Dashboard.pages.data_drift import data_drift_layout
+from Dashboard.pages.model_upload import model_upload_layout
+from Dashboard.pages.performance_estimator import performance_estimator_layout
+from Dashboard.pages.help import help_layout
+from Dashboard.pages.about_us import about_us_layout
+from Dashboard.pages.not_found import not_found_layout
+from Dashboard.pages.home import home_layout
+from Dashboard.pages.maintenance import maintenance_layout
+from Dashboard.pages.admin_panel import admin_panel_layout
 
 # Callback to handle sections
 @dash.callback(
-    Output("page-content", "children"),
-    Input("url", "pathname"))
-def display_page(pathname):
+    Output("main-content", "children"),
+    Input("url", "pathname"),
+    State("user-session", "data"))
+def display_page(pathname, session_data):
+    if not session_data or not session_data.get("authenticated"):
+        return login_form()
     if pathname == "/" or pathname == "/home":
         return home_layout()
     if pathname == "/data-source":
@@ -37,6 +43,8 @@ def display_page(pathname):
          return about_us_layout()
     elif pathname == "/help":
         return help_layout()
+    if pathname == "/admin":
+        return admin_panel_layout()
     else:
         return not_found_layout()
     

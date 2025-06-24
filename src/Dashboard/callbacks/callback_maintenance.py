@@ -7,11 +7,13 @@ import dash
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 import io
-from utils import model_information,sqlite_handler
+import sqlite3
+from Dashboard.utils import model_information,sqlite_handler
 import plotly.express as px
-from utils.utils_maintenance import generate_prediction_name
+from Dashboard.utils.utils_maintenance import generate_prediction_name
+from Dashboard.config import INFLUXDB, BASE_URL_API, INFLUXDB_BUCKET
 
 
 dfc = pd.DataFrame()
@@ -447,3 +449,105 @@ def handle_report_click(active_cell, table_data):
         return True, row_data  # open modal with data
 
     return False, dash.no_update
+
+@dash.callback(
+    Output("download-excel-report", "data"),
+    Input("generate-report-btn", "n_clicks"),
+    Input("model-data-store", "data"),
+    State("experiment-id-display-maintenence", "children"),
+    State("model-selector-maintenance", "value"),
+    State("time-window-slider", "value"),
+    State("selected-variables-maintenance", "data"),
+    State("prediction-table", "data"),
+    prevent_initial_call=True
+)
+# Generate Report
+def generate_excel_report(n_clicks,data, experiment_id, model_selected, time_range, selected_vars, table_data):
+    # Sheet1: Info general
+    #get name var prediction
+    prediction_var = generate_prediction_name(data["model_file"])
+
+    info_dict = {
+        "Experiment ID": [experiment_id],
+        "User": [experiment_id],
+        "Selected model": [model_selected],
+        "Time range start": [time_range[0]],
+        "Time range end": [time_range[1]],
+        "Selected variables": [", ".join([f"{v['variable_name']}" for v in selected_vars])],
+        "Model metadata": [f"{BASE_URL_API}/metadata/{prediction_var.split('_')[-1]}"],
+        "Database": [INFLUXDB], 
+        "Bucket": [INFLUXDB_BUCKET], 
+    }
+    df_info = pd.DataFrame(info_dict)
+
+    # Sheet2: Prediction Table
+    df_prediction = pd.DataFrame(table_data)
+    selected_columns = [v['variable_name'] for v in selected_vars]
+
+    columns_dict = {
+        "Timestamp": df_prediction["raw_time"],
+        "Simulation": df_prediction["raw_prediction"]
+    }
+
+    for var in selected_columns:
+        if var in df_prediction.columns:
+            columns_dict[var] = df_prediction[var]
+
+    df_transformed_pred = pd.DataFrame(columns_dict)
+
+    # Sheet3: Data from SQLite (point_report)
+    try:
+        # Obtiene el path absoluto relativo a este archivo Python
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_path, "..", "Data", "point_report.db")
+        conn = sqlite3.connect(db_path)
+        df_report = pd.read_sql_query(
+            "SELECT * FROM point_report WHERE measurement = ?", 
+            conn, 
+            params=(experiment_id,)
+        )
+        conn.close()
+        #data printeable for excel
+        df_transformed_report = pd.DataFrame({
+            "timestamp": df_report["time"],
+            "_measurement": "Experiment ID",  # valor fijo
+            "measurement_value": df_report["measurement"],
+            "tag_1": df_report["type"],
+            "tag_2": df_report["level"],
+            "field_1": df_report["prediction_var"],
+            "field_value": df_report["value"]
+        })
+    except Exception as e:
+        df_report = pd.DataFrame({"error": [str(e)]})
+        df_transformed_report = pd.DataFrame({"error": [str(e)]})
+
+    # Adjust simulation data add type and level
+    if not df_transformed_pred.empty and not df_report.empty:
+
+        # 1. Convertir ambas columnas a datetime
+        df_transformed_pred["Timestamp"] = pd.to_datetime(df_transformed_pred["Timestamp"], format="ISO8601")
+        df_report["time"] = pd.to_datetime(df_report["time"], format="ISO8601")
+
+        # 2. Hacer el merge por timestamp
+        df_transformed_pred = pd.merge(
+            df_transformed_pred,
+            df_report[["time", "type", "level"]],
+            left_on="Timestamp",
+            right_on="time",
+            how="left"
+        )
+
+        # 3. Eliminar la columna duplicada 'time' (opcional)
+        df_transformed_pred.drop(columns=["time"], inplace=True)
+        # Eliminar zona horaria de las columnas datetime
+        df_transformed_pred["Timestamp"] = df_transformed_pred["Timestamp"].astype(str)
+    # Crear archivo Excel en memoria
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_info.to_excel(writer, index=False, sheet_name="Metadata")
+        df_transformed_pred.to_excel(writer, index=False, sheet_name="Simulation")
+        df_transformed_report.to_excel(writer, index=False, sheet_name="Flagged Measurements_DB")
+    output.seek(0)
+
+    return dcc.send_bytes(output.read(), filename="report.xlsx")
+

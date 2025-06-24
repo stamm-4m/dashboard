@@ -8,6 +8,8 @@ from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
 import pandas as pd
+import numpy as np
+
 
 
 @dash.callback(
@@ -33,27 +35,22 @@ def sync_experiment_selection(experiment_id, store_data):
     return experiment_id, {"selected_experiment": experiment_id} if experiment_id else {}
     
 @dash.callback(
-    [Output("bucket-dropdown", "options"),
-    Output("experiment-dropdown", "options")],
-    [Input("bucket-dropdown", "value")]
+    [Output("experiment-dropdown", "options")],
+    [Input("url", "pathname")]
 )
-def update_dropdowns(selected_bucket):
-    """Updates the dropdown options based on ONLINE/OFFLINE state."""
+def update_dropdowns(pathname):
+    """Load experiment options when page loads or URL changes."""
     try:
-        bucket_options = [{"label": b, "value": b} for b in influxdb_handler.get_buckets()]
-        experiment_options = []
-        if selected_bucket:
-            # Solo obtener experimentos con datos en los últimos 5 minutos
-            #exp_recent = influxdb_handler.get_recent_experiment_ids(selected_bucket, minutes=5)
-            # Obtener todos los experimentos sin importar la fecha
-            exp_all = influxdb_handler.get_distinct_experiment_ids(selected_bucket)
-            print("Experiments ID: ",exp_all)
-            experiment_options = [{"label": exp, "value": exp} for exp in exp_all]
+        exp_all = influxdb_handler.get_distinct_experiment_ids()
+        print("Experiments ID: ", exp_all)
 
-        return bucket_options, experiment_options
+        experiment_options = [{"label": exp, "value": exp} for exp in exp_all]
+
+        return [experiment_options]  # Siempre lista dentro de otra lista
     except Exception as e:
         print(f"Error updating dropdowns: {e}")
-        return [], []
+        return [[]]
+
 
 @dash.callback(
     Output("duration-text", "children"),
@@ -75,33 +72,40 @@ def update_duration_text(experiment_id):
 
 @dash.callback(
     Output("bar-chart", "figure"),
-    [Input("bucket-dropdown", "value"),
-    Input("experiment-dropdown", "value")]
+    [Input("experiment-dropdown", "value")]
 )
-def update_bar_chart(bucket, experiment_id):
+def update_bar_chart(experiment_id):
     """Updates the bar chart with experiment data."""
-    if not bucket or not experiment_id:
+    if not experiment_id:
         raise PreventUpdate
 
     try:
-        category_counts = influxdb_handler.get_category_counts(bucket, experiment_id)
-        return go.Figure(data=[go.Bar(x=list(category_counts.keys()), y=list(category_counts.values()))])
+        category_counts = influxdb_handler.get_category_counts(experiment_id)
+        fig =  go.Figure(
+            data=[go.Bar(x=list(category_counts.keys()), y=list(category_counts.values()))]
+            )
+        fig.update_layout(
+            title={
+            'text': f'Number of variables by type in Experiment {experiment_id}',
+            'x': 0.5  # Centra el título horizontalmente
+    }
+        )
+        return fig
     except Exception as e:
         print(f"Error updating bar chart: {e}")
         return go.Figure()
 
 @dash.callback(
     Output("data-table", "data"),
-    [Input("bucket-dropdown", "value"),
-    Input("experiment-dropdown", "value")]
+    [Input("experiment-dropdown", "value")]
 )
-def update_table_data(bucket, experiment_id):
+def update_table_data(experiment_id):
     """Updates the table with data from the selected experiment."""
-    if not bucket or not experiment_id:
+    if not experiment_id:
         raise PreventUpdate
 
     try:
-        raw_data = influxdb_handler.get_data_for_table(bucket, experiment_id)
+        raw_data = influxdb_handler.get_data_for_table(experiment_id)
         # Ensure variable names exist and categorize them
         processed_data = []
         for row in raw_data:
@@ -171,17 +175,14 @@ def display_project_details(value):
     Output('histogram_experiments', 'figure'),
     Output('prev_experiment_ids', 'data'),
     Input('interval-component', 'n_intervals'),
-    Input('bucket-dropdown', 'value'),
     State('prev_experiment_ids', 'data'),
 )
-def update_histogram(n, bucket, prev_data):
-    if bucket is None:
-        return px.bar(title="Please select a bucket to display data"), prev_data
-
-    count_df = influxdb_handler.get_count_data_experiment_ids(bucket)
+def update_histogram(n, prev_data):
+    
+    count_df = influxdb_handler.get_count_data_experiment_ids()
 
     if count_df.empty:
-        return px.bar(title="No experiments found for the selected bucket"), prev_data
+        return px.bar(title="No experiments found for the  bucket"), prev_data
 
     # Convert previous data to dict if exists, otherwise empty
     prev_data = prev_data or {}
@@ -204,10 +205,59 @@ def update_histogram(n, bucket, prev_data):
         x='experiment_id',
         y='num_points',
         labels={'experiment_id': 'Experiment ID', 'num_points': 'Number of Points'},
-        title=f'Number of Data Points per Experiment ID in Bucket "{bucket}"',
         color='experiment_id',
         color_discrete_map=color_map
+    )
+    fig.update_layout(
+        title={
+            'text': 'Number of data points per experiment',
+            'x': 0.5  # Centrar el título
+        }
     )
     fig.update_layout(showlegend=False)
 
     return fig, current_data  # <-- Guarda el nuevo estado con conteo
+
+@dash.callback(
+    Output("table-experiments-online", "data"),
+    Input("interval-component", "n_intervals")
+)
+def update_online_experiments(n_intervals):
+    try:
+        summary = influxdb_handler.get_online_experiments_summary()
+
+        # Si la función devuelve un solo dict, lo empaquetas como lista
+        if isinstance(summary, dict):
+            return [summary]
+
+        # Si ya es lista, la devuelves tal cual
+        return summary if summary else []
+
+    except Exception as e:
+        print(f"[Error] update_online_experiments: {e}")
+        return []
+
+
+@dash.callback(
+    Output("table-experiments-previous", "data"),
+    Input("interval-component", "n_intervals")
+)
+def update_previous_experiments(n_intervals):
+    try:
+        results = influxdb_handler.get_previous_experiments_summary()
+
+        print("Resultados previos limpios:", results)
+
+        if not results:
+            return []
+
+        # Casteo preventivo por si quedó algo en formato raro
+        for item in results:
+            if isinstance(item["Temperature"], (np.floating, np.float64)):
+                item["Temperature"] = float(item["Temperature"])
+
+        return results
+
+    except Exception as e:
+        print(f"[Error] update_previous_experiments: {e}")
+        return []

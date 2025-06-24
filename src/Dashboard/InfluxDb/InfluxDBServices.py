@@ -264,7 +264,7 @@ class InfluxDBServices:
 
 
 
-    def get_distinct_experiment_ids(self, bucket_name, time_range="-90d"):
+    def get_distinct_experiment_ids(self, time_range="-120d"):
         """
         Retrieves a unique list of experiment_ID from the specified bucket in InfluxDB.
 
@@ -278,7 +278,7 @@ class InfluxDBServices:
         try:
             # Query to retrieve unique experiment_ID
             query = f"""
-            from(bucket: "{bucket_name}")
+            from(bucket: "{INFLUXDB_BUCKET}")
             |> range(start: {time_range})
             |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Asegura que experiment_ID existe
             |> keep(columns: ["{str(BACH_ID)}"])
@@ -300,16 +300,15 @@ class InfluxDBServices:
             return experiment_ids
 
         except Exception as e:
-            print(f"Error retrieving experiment_ID from bucket '{bucket_name}': {e}")
+            print(f"Error retrieving experiment_ID from bucket '{INFLUXDB_BUCKET}': {e}")
             return []
 
-    def get_category_counts(self, bucket_name, experiment_ID, time_range="-90d"):
+    def get_category_counts(self, experiment_ID, time_range="-90d"):
         """
         Retrieves the count of sensors, actuators, soft sensors, and computed variables
-        for a specific bucket and experiment_ID.
+        for a specific experiment_ID.
 
         Args:
-            bucket_name (str): Name of the bucket.
             experiment_ID (str): ID of the experiment to filter.
             time_range (str): Time range for the query (default is "-90d").
 
@@ -318,11 +317,11 @@ class InfluxDBServices:
         """
         try:
 
-            logging.info(f"Fetching category counts for experiment: {experiment_ID} in bucket: {bucket_name}")
+            logging.info(f"Fetching category counts for experiment: {experiment_ID} in bucket: {INFLUXDB_BUCKET}")
             
             # Query to retrieve data counts by category
             query = f"""
-            from(bucket: \"{bucket_name}\")
+            from(bucket: \"{INFLUXDB_BUCKET}\")
             |> range(start: {time_range})
             |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == \"{experiment_ID}\")
             |> keep(columns: [\"type\", \"_field\"])
@@ -345,7 +344,7 @@ class InfluxDBServices:
             logging.error(f"Error retrieving category counts: {e}")
             return {"sensor": 8, "actuator": 11, "computed_variable": 2, "soft_sensor": 1, "offline_measurement": 5}
 
-    def get_experiment_duration(self, experiment_ID, time_range="-90d"):
+    def get_experiment_duration(self, experiment_ID, time_range="-100d"):
         """
         Fetch the duration of an experiment based on its ID.
 
@@ -400,14 +399,14 @@ class InfluxDBServices:
             print(f"Error in get_experiment_duration: {e}")
             return None
 
-    def get_data_for_table(self, bucket_name, experiment_ID, time_range="-90d"):
+    def get_data_for_table(self, experiment_ID, time_range="-100d"):
         """
         Fetch the data required for populating the DataTable, adding units based on the variable mapping.
         """
         try:
             queries = {
                 "mean": f"""
-                from(bucket: "{bucket_name}")
+                from(bucket: "{INFLUXDB_BUCKET}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
                 |> keep(columns: ["type", "_field", "_value"])
@@ -415,7 +414,7 @@ class InfluxDBServices:
                 |> mean()
                 """,
                 "max": f"""
-                from(bucket: "{bucket_name}")
+                from(bucket: "{INFLUXDB_BUCKET}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
                 |> keep(columns: ["type", "_field", "_value"])
@@ -423,7 +422,7 @@ class InfluxDBServices:
                 |> max()
                 """,
                 "min": f"""
-                from(bucket: "{bucket_name}")
+                from(bucket: "{INFLUXDB_BUCKET}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
                 |> keep(columns: ["type", "_field", "_value"])
@@ -563,7 +562,7 @@ class InfluxDBServices:
                 print("✅ Writing point:", point.to_line_protocol())
                 write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)
     
-    def get_count_data_experiment_ids(self, bucket_name: str, time_range="-90d"):
+    def get_count_data_experiment_ids(self, time_range="-90d"):
         """
         Retrieves a DataFrame with experiment_IDs and their count from the specified bucket in InfluxDB.
 
@@ -579,7 +578,7 @@ class InfluxDBServices:
         try:
             # Build the Flux query to retrieve all experiment_id values
             query = f"""
-            from(bucket: "{bucket_name}")
+            from(bucket: "{INFLUXDB_BUCKET}")
             |> range(start: {time_range})
             |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Ensure experiment_id field exists
             |> keep(columns: ["{str(BACH_ID)}"])              // Keep only the experiment_id column
@@ -710,5 +709,131 @@ class InfluxDBServices:
 
         except Exception as e:
             print("❌ Error in safe update:", e)
+
+    def get_online_experiments_summary(self, minutes=5):
+        """
+        Resumen de experimentos online: Batch size y Yields, basado en los últimos minutos.
+        """
+        try:
+            flux_query = f"""
+            from(bucket: "{self.connector.bucket}")
+            |> range(start: -{minutes}m)
+            |> filter(fn: (r) => exists r["_measurement"])
+            |> group(columns: ["_measurement"])
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            """
+
+            df = self.connector.query_api.query_data_frame(flux_query)
+
+            if df.empty:
+                print("[INFO] No recent data found.")
+                return []
+
+            # Asegúrate que exista experiment_id
+            if "_measurement" not in df.columns:
+                print("[WARNING] No experiment_id field found.")
+                return []
+
+            experiment_ids = df["_measurement"].unique()
+            results = []
+
+            for exp_id in experiment_ids:
+                df_exp = df[df["_measurement"] == exp_id]
+                
+                batch_size = int(df_exp.shape[0])
+
+                real_vars = [col for col in df_exp.columns if not col.startswith("pred_") and col not in ["result", "table", "_start", "_stop", "_time", "_measurement", "experiment_id"]]
+                yields = int(len(real_vars))
+
+                temperature = float(df_exp["temperature"].mean()) if "temperature" in df_exp.columns else "N/A"
+
+                last_date = df_exp["_time"].max()
+                last_date_str = pd.to_datetime(last_date).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(last_date) else "N/A"
+
+                results.append({
+                    "Experiment ID": exp_id,
+                    "Date": last_date_str,
+                    "Batch size": batch_size,
+                    "Yields": yields,
+                    "Temperature": round(temperature, 2) if isinstance(temperature, (float, int)) else "N/A"
+                })
+
+            return results
+
+        except Exception as e:
+            print(f"[ERROR] get_online_experiments_summary: {e}")
+            return []
+
+    def get_previous_experiments_summary(self, minutes=5):
+        """
+        Devuelve resumen de experimentos que NO tienen datos en los últimos N minutos:
+        Experiment ID, Batch size, Yields, Temperatura promedio.
+        """
+        try:
+            # 1. Obtener todos los experimentos históricos
+            all_experiments = self.get_distinct_experiment_ids()
+
+            # 2. Obtener experimentos con datos recientes
+            recent_query = f"""
+            from(bucket: "{self.connector.bucket}")
+            |> range(start: -{minutes}m)
+            |> filter(fn: (r) => exists r["_measurement"])
+            |> keep(columns: ["_measurement"])
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            """
+
+            recent_df = self.connector.query_api.query_data_frame(recent_query)
+
+            recent_experiments = recent_df["_measurement"].unique().tolist() if not recent_df.empty else []
+
+            # 3. Filtrar solo los experimentos que NO están en los recientes
+            previous_experiments = [exp for exp in all_experiments if exp not in recent_experiments]
+
+            if not previous_experiments:
+                return []
+
+            results = []
+
+            # 4. Recorrer los experimentos previos y obtener resumen de cada uno
+            for exp_id in previous_experiments:
+                query = f"""
+                from(bucket: "{self.connector.bucket}")
+                |> range(start: 0)
+                |> filter(fn: (r) => r["_measurement"] == "{exp_id}")
+                |> group(columns: ["_measurement"])
+                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                """
+
+                df = self.connector.query_api.query_data_frame(query)
+
+                if df.empty:
+                    continue
+
+                batch_size = int(df.shape[0])
+
+                real_vars = [col for col in df.columns if not col.startswith("pred_") and col not in ["result", "table", "_start", "_stop", "_time", "_measurement", "experiment_id"]]
+                yields = int(len(real_vars))
+
+                temperature = float(df["temperature"].mean()) if "temperature" in df.columns else "N/A"
+
+                # Última fecha de dato
+                last_date = df["_time"].max()
+                last_date_str = pd.to_datetime(last_date).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(last_date) else "N/A"
+
+                results.append({
+                    "Experiment ID": exp_id,
+                    "Date": last_date_str,
+                    "Batch size": batch_size,
+                    "Yields": yields,
+                    "Temperature": round(temperature, 2) if isinstance(temperature, (float, int)) else "N/A"
+                })
+
+            return results
+
+        except Exception as e:
+            print(f"[ERROR] get_previous_experiments_summary: {e}")
+            return []
+
+
 
 

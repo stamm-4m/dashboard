@@ -14,6 +14,7 @@ style_data_conditional=[
         'cursor': 'pointer',
         'fontWeight': 'bold',
         'margin-bottom': '0px'
+
     },
 ]
 
@@ -121,6 +122,23 @@ def maintenance_layout():
             dbc.Col(html.Div(id="save-confirmation", className="text-success"),width=12),
             dbc.Col(html.Div(id="save-confirmation2", className="text-success"),width=12)
         ], className="mt-4"),
+
+        #Generate report
+        dbc.Row([
+            dbc.Col(
+                html.Div([
+                    dbc.Button(
+                        [html.I(className="bi bi-file-earmark-excel-fill me-2"), "Generate Report"],
+                        id="generate-report-btn",
+                        color="success",
+                        className="mt-4",
+                        style={"fontWeight": "bold"}
+                    ),
+                    dcc.Download(id="download-excel-report")  # 👈 Asegúrate que esté dentro de un contenedor
+                ]),
+                width="auto"
+            )
+        ]),
 
         # Modal: Save simulation
         dbc.Modal([

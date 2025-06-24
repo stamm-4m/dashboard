@@ -1,7 +1,10 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-def sidebar():
+def sidebar(session_data = None):
+    is_admin = session_data and session_data.get("role") == "admin"
+    is_authenticated = session_data and session_data.get("authenticated")
+
     return html.Div([
         html.H2("STAMM", className="fw-bold text-center"),
         dcc.Store(id="store-selected-state", storage_type="local"),
@@ -21,6 +24,8 @@ def sidebar():
         html.P(
             "Soft sensor moniToring and mAintenance framework for Machine learning Models.", className="text-center"
         ),
+        html.Hr() if is_authenticated else None,
+        html.H4(f"Welcome, {session_data.get('user')}") if is_authenticated else None,
         dbc.Nav(
             [   
                 dbc.NavLink(
@@ -85,7 +90,11 @@ def sidebar():
                 ),
                 html.Hr(),
                 dbc.NavLink("About us", href="/about-us", className="sidebar-link", active="exact"),
-                dbc.NavLink("Help", href="/help", className="sidebar-link", active="exact")
+                dbc.NavLink("Help", href="/help", className="sidebar-link", active="exact"),
+                # options administrator
+                html.Hr() if is_admin else None,
+                dbc.NavLink("Admin Panel", href="/admin", className="sidebar-link text-warning") if is_admin else None,
+                dbc.NavLink([html.I(className="bi bi-box-arrow-right me-2"),"Logout"], id={"type": "logout-button", "index": 1}, className="sidebar-link text-danger") if is_authenticated else None,
             ],
             vertical=True,  # Ensures links are displayed one below the other
         )])
