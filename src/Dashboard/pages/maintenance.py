@@ -101,7 +101,31 @@ def maintenance_layout():
         ),
         # Tabla debajo del gráfico
         # EventListener alrededor de la tabla
-       dash_table.DataTable(
+        dbc.Row([
+            dbc.Col([
+                dbc.Label("Filter by Variable Name"),
+                dcc.Dropdown(
+                    id="filter-name-selector",
+                    options=[],  # se actualiza dinámicamente
+                    placeholder="Select a column"
+                )
+            ], width=3),
+            dbc.Col([
+                dbc.Label("-"),
+                dbc.Input(id="filter-value-input", type="text", placeholder="Enter value...")
+            ], width=3),
+        ]),
+        dbc.Row([
+            dbc.Col(
+                html.Small(
+                    "Use numeric filters (e.g. '> 2.5', '<= 10') or partial text (e.g. '2025-07-15')",
+                    className="text-muted"
+                ),
+                width=6
+            )
+        ], className="mb-2"),
+        html.Br(),
+        dash_table.DataTable(
                     id="prediction-table",
                     columns=[],  # se rellenan dinámicamente
                     data=[],     # también se llena dinámicamente
@@ -113,8 +137,8 @@ def maintenance_layout():
                     style_data_conditional=style_data_conditional,
                     editable=False,
                     column_selectable=False
-                    
                     ),
+        dcc.Store(id="prediction-table-store"),
        
         dcc.Store(id="clicked-report-info"),
         dcc.Store(id="selected-variables-maintenance", data=[]),
@@ -158,7 +182,7 @@ def maintenance_layout():
                 ),
 
                 # 🔽 Dropdown de Tipo
-                html.Label("Type", className="mt-2"),
+                html.Label("Flag", className="mt-2"),
                 dcc.Dropdown(
                     id="dropdown-tipo",
                     options=[
@@ -167,6 +191,13 @@ def maintenance_layout():
                         {"label": "Repeat", "value": "value_repeat"},
                     ],
                     placeholder="Select type"
+                ),
+                # Flag Description 
+                html.Label("Flagged measurement description", className="mt-2"),
+                dbc.Textarea(
+                    id="description-flagged",
+                    placeholder="Enter description...",
+                    style={"width": "100%"}
                 ),
 
             ]),

@@ -63,6 +63,7 @@ def update_duration_text(experiment_id):
     
     try:
         duration = influxdb_handler.get_experiment_duration(experiment_id)
+        print(duration)
         if duration >= 24:
             return f"Experiment Duration: {round(duration / 24)} days"
         return f"Experiment Duration: {round(duration)} hours"
@@ -71,42 +72,20 @@ def update_duration_text(experiment_id):
         return "Experiment Duration: Error"
 
 @dash.callback(
-    Output("bar-chart", "figure"),
-    [Input("experiment-dropdown", "value")]
-)
-def update_bar_chart(experiment_id):
-    """Updates the bar chart with experiment data."""
-    if not experiment_id:
-        raise PreventUpdate
-
-    try:
-        category_counts = influxdb_handler.get_category_counts(experiment_id)
-        fig =  go.Figure(
-            data=[go.Bar(x=list(category_counts.keys()), y=list(category_counts.values()))]
-            )
-        fig.update_layout(
-            title={
-            'text': f'Number of variables by type in Experiment {experiment_id}',
-            'x': 0.5  # Centra el título horizontalmente
-    }
-        )
-        return fig
-    except Exception as e:
-        print(f"Error updating bar chart: {e}")
-        return go.Figure()
-
-@dash.callback(
-    Output("data-table", "data"),
+    [Output("data-table", "data"),
+     Output("table-title-container", "children")],
     [Input("experiment-dropdown", "value")]
 )
 def update_table_data(experiment_id):
-    """Updates the table with data from the selected experiment."""
+    """
+    Updates the table and its title with data from the selected experiment.
+    """
     if not experiment_id:
         raise PreventUpdate
 
     try:
         raw_data = influxdb_handler.get_data_for_table(experiment_id)
-        # Ensure variable names exist and categorize them
+        
         processed_data = []
         for row in raw_data:
             if "Name" in row and row["Name"]:
@@ -115,10 +94,13 @@ def update_table_data(experiment_id):
                 row["Type"] = "Unknown"
             processed_data.append(row)
         
-        return processed_data
+        title = html.H5(f"Statistical summary of the variables from the chosen experiment: {experiment_id}")
+
+        return processed_data, title
+
     except Exception as e:
         print(f"Error updating table data: {e}")
-        return []
+        return [], html.H4("Error loading experiment data")
 
 @dash.callback(
     [Output("offline-link", "disabled"),
@@ -172,92 +154,157 @@ def display_project_details(value):
         return html.P("The information project not found.")
     
 @dash.callback(
-    Output('histogram_experiments', 'figure'),
-    Output('prev_experiment_ids', 'data'),
-    Input('interval-component', 'n_intervals'),
-    State('prev_experiment_ids', 'data'),
-)
-def update_histogram(n, prev_data):
-    
-    count_df = influxdb_handler.get_count_data_experiment_ids()
-
-    if count_df.empty:
-        return px.bar(title="No experiments found for the  bucket"), prev_data
-
-    # Convert previous data to dict if exists, otherwise empty
-    prev_data = prev_data or {}
-    
-    current_data = dict(zip(count_df['experiment_id'], count_df['num_points']))
-    changed_ids = []
-
-    for eid, count in current_data.items():
-        if eid not in prev_data or count > prev_data[eid]:
-            changed_ids.append(eid)
-
-    # Color map: changed = naranja, igual = azul
-    color_map = {
-        eid: '#FF5733' if eid in changed_ids else '#4682B4'
-        for eid in current_data.keys()
-    }
-
-    fig = px.bar(
-        count_df,
-        x='experiment_id',
-        y='num_points',
-        labels={'experiment_id': 'Experiment ID', 'num_points': 'Number of Points'},
-        color='experiment_id',
-        color_discrete_map=color_map
-    )
-    fig.update_layout(
-        title={
-            'text': 'Number of data points per experiment',
-            'x': 0.5  # Centrar el título
-        }
-    )
-    fig.update_layout(showlegend=False)
-
-    return fig, current_data  # <-- Guarda el nuevo estado con conteo
-
-@dash.callback(
     Output("table-experiments-online", "data"),
-    Input("interval-component", "n_intervals")
+    Output("experiment-message", "children"),
+    Output("experiment-message", "color"),
+    Output("experiment-message", "is_open"),
+    Input("interval-component", "n_intervals"),
+    Input("time-unit-selector", "value"),
+    Input("time-value-selector", "value")
 )
-def update_online_experiments(n_intervals):
+def update_online_experiments(n_intervals, selected_unit, selected_value):
+    """
+    Periodically updates the experiment table with online data, applying time filtering
+    based on the selected unit and value.
+
+    Args:
+        n_intervals (int): Number of triggered intervals (from dcc.Interval).
+        selected_unit (str): Time unit selected by the user (seconds, minutes, etc.).
+        selected_value (int): Time range value selected by the user.
+
+    Returns:
+        list: List of dictionaries with experiment data filtered by the selected time window.
+    """
     try:
-        summary = influxdb_handler.get_online_experiments_summary()
+        if not selected_unit or not selected_value:
+            return [], "Please select a valid time range.", "warning", True
+        
+        summary = influxdb_handler.get_online_experiments_summary(
+            time_unit=selected_unit,
+            time_value=selected_value
+        )
+
+        if not summary:
+            return [], "No recent data found for the selected time range.", "info", True
+
 
         # Si la función devuelve un solo dict, lo empaquetas como lista
         if isinstance(summary, dict):
-            return [summary]
+            return [summary], "", "info", False  # Hide the alert when there is data
+        
+        if isinstance(summary, list) and summary:
+            return summary, "", "info", False  # Hide the alert when there is data
 
-        # Si ya es lista, la devuelves tal cual
-        return summary if summary else []
+        # Fallback if summary is a list but empty (precaución extra)
+        return [], "No recent data found for the selected time range.", "info", True
 
     except Exception as e:
         print(f"[Error] update_online_experiments: {e}")
-        return []
+        return [], "An error occurred while fetching the data.", "danger", True
+
 
 
 @dash.callback(
-    Output("table-experiments-previous", "data"),
-    Input("interval-component", "n_intervals")
+    Output("line-experiments", "figure"),
+    Input("interval-value", "value"),
+    Input("time-unit-interval", "value"),
+    Input("field-selector", "value"),
 )
-def update_previous_experiments(n_intervals):
+def update_timeseries_data_count(interval_value, interval_unit,selected_field):
+    """
+    Updates the time series chart showing valid data point counts per interval.
+    """
+    print(selected_field)
     try:
-        results = influxdb_handler.get_previous_experiments_summary()
+        if not interval_value or not interval_unit or not selected_field:
+            return go.Figure()
 
-        print("Resultados previos limpios:", results)
+        # Obtener los datos desde Influx 
+        df = influxdb_handler.get_recent_data_for_graph()  
+
+        if df.empty or "_time" not in df.columns:
+            return go.Figure()
+
+        df["_time"] = pd.to_datetime(df["_time"])
+        
+        results = []
+
+        unit_map = {
+            "seconds": "S",
+            "minutes": "min", 
+            "hours": "H",
+            "days": "D",
+            "months": "MS"  
+        }
+        
+        interval_str = f"{interval_value}{unit_map[interval_unit]}"
+
+        for exp_id in df["_measurement"].unique():
+            df_exp = df[df["_measurement"] == exp_id].copy()
+            df_exp.set_index("_time", inplace=True)
+
+            counts = df_exp.resample(interval_str).count()
+            counts["Experiment ID"] = exp_id
+            counts = counts.reset_index()
+
+            if selected_field == "all":
+                data_count = counts.drop(columns=["_time", "Experiment ID"], errors="ignore").sum(axis=1)
+            else:
+                if selected_field not in counts.columns:
+                    continue  # Si la columna no existe, omitir
+                data_count = counts[selected_field]
+
+            partial_df = pd.DataFrame({
+                "_time": counts["_time"],
+                "Experiment ID": exp_id,
+                "Data Count": data_count
+            })
+
+            results.append(partial_df)
 
         if not results:
-            return []
+            return go.Figure()
 
-        # Casteo preventivo por si quedó algo en formato raro
-        for item in results:
-            if isinstance(item["Temperature"], (np.floating, np.float64)):
-                item["Temperature"] = float(item["Temperature"])
+        final_df = pd.concat(results, ignore_index=True)
 
-        return results
+        fig = px.line(
+            final_df,
+            x="_time",
+            y="Data Count",
+            color="Experiment ID",
+            title=f"Data Count Every {interval_value} {interval_unit} ({selected_field})"
+        )
+
+        fig.update_layout(margin={"l": 20, "r": 20, "t": 50, "b": 20})
+
+        return fig
 
     except Exception as e:
-        print(f"[Error] update_previous_experiments: {e}")
-        return []
+        print(f"[ERROR] update_timeseries_data_count: {e}")
+        return go.Figure()
+
+@dash.callback(
+    Output("field-selector", "options"),
+    Input("interval-component", "n_intervals"),
+)
+def load_field_options(n_intervals):
+    """
+    Dynamically loads available fields from InfluxDB for the dropdown.
+    """
+    try:
+        df = influxdb_handler.get_recent_data_for_graph()
+
+        if df.empty:
+            return [{"label": "All fields", "value": "all"}]
+
+        excluded = ["_time", "_measurement", "experiment_id", "_start", "_stop","result","table","Batch"]
+        valid_fields = [col for col in df.columns if col not in excluded]
+
+        options = [{"label": "All fields", "value": "all"}]
+        options += [{"label": field.capitalize(), "value": field} for field in valid_fields]
+
+        return options
+
+    except Exception as e:
+        print(f"[ERROR] load_field_options: {e}")
+        return [{"label": "All fields", "value": "all"}]

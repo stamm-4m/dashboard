@@ -1,11 +1,12 @@
 import os
 from dash import Input, Output, State, dcc, ALL, ctx, html,no_update
 from dash import callback_context
-
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash
 import pandas as pd
 import numpy as np
+import re
 import plotly.graph_objects as go
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 import io
@@ -85,12 +86,119 @@ def update_name_selector(selected_category,model_name):
             else:
                 # Return an empty list if no category is selected
                 return []
-            
+@dash.callback(
+    Output("filter-name-selector", "options"),
+    Input("prediction-table", "columns"),
+    prevent_initial_call=True
+)
+def update_filter_column_options(column_list):
+    """
+    Update the options of the column selector dropdown for filtering.
+
+    Parameters:
+    - column_list (list): List of column metadata from the DataTable (each item is a dict with 'name' and 'id').
+
+    Returns:
+    - list: A list of options for the dropdown, excluding columns like 'Report', 'raw_time', and 'raw_prediction'.
+    """
+    if not column_list:
+        raise PreventUpdate
+    return [
+        {"label": col["name"], "value": col["id"]}
+        for col in column_list
+        if isinstance(col, dict)
+        and "name" in col
+        and "id" in col
+        and col["id"] not in ["Report", "raw_time", "raw_prediction"]
+    ]
+
+
+@dash.callback(
+    Output("prediction-table", "data", allow_duplicate=True),
+    Input("filter-name-selector", "value"),
+    Input("filter-value-input", "value"),
+    State("prediction-table-store", "data"),
+    prevent_initial_call=True
+)
+def filter_table(selected_column, value_filter, original_data):
+    """
+    Filter the DataTable data based on the selected column and user-defined value.
+
+    Parameters:
+    - selected_column (str): The column ID selected for filtering.
+    - value_filter (str): The string input used to filter the selected column.
+                          Can be a partial string (e.g., for time) or a numeric condition (e.g., "> 5").
+    - original_data (list of dicts): The unfiltered data stored in the backend.
+
+    Returns:
+    - list of dicts: The filtered subset of the original data.
+    """
+    if not original_data or not selected_column:
+        raise PreventUpdate
+
+    filtered = original_data
+
+    if not value_filter:
+        return filtered
+
+    value_filter = value_filter.strip()
+    op_match = re.match(r"([<>]=?|=)\s*(-?\d+(\.\d+)?)", value_filter)
+
+    if op_match:
+        # If the filter is a numeric condition (e.g., "> 2.5")
+        op, val, _ = op_match.groups()
+        val = float(val)
+
+        def compare(v):
+            try:
+                fv = float(v)
+                if op == ">":
+                    return fv > val
+                elif op == "<":
+                    return fv < val
+                elif op == ">=":
+                    return fv >= val
+                elif op == "<=":
+                    return fv <= val
+                elif op == "=":
+                    return fv == val
+            except:
+                return False
+
+        filtered = [row for row in filtered if compare(row.get(selected_column))]
+
+    else:
+        # If it's not numeric, apply a partial text match (e.g., for datetime strings)
+        filtered = [
+            row for row in filtered
+            if selected_column in row and value_filter.lower() in str(row[selected_column]).lower()
+        ]
+
+    return filtered
+
+
+def is_float(val):
+    """
+    Check if a given value can be converted to a float.
+
+    Parameters:
+    - val (any): The value to check.
+
+    Returns:
+    - bool: True if val can be converted to float, False otherwise.
+    """
+    try:
+        float(val)
+        return True
+    except (ValueError, TypeError):
+        return False
+
 # Callback to update the maintenance graph
 @dash.callback(
     Output("maintenance-graph", "figure"),
     Output("prediction-table", "data"),  
     Output("prediction-table", "columns"),
+    Output("prediction-table-store", "data"),
     Input("model-data-store", "data"),
     Input("store-selected-state", "data"),
     Input("time-window-slider", "value"),
@@ -103,7 +211,7 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
     global dfc
     if not data_exp or "selected_experiment" not in data_exp or not data_exp["selected_experiment"]:
         print("No experiment ID Selected")
-        return go.Figure(), [],[]
+        return go.Figure(), [],[],[]
     
     dfc = influxdb_handler.get_data_by_batch_id2(data_exp["selected_experiment"])
     print("dfc: ",dfc)
@@ -116,7 +224,7 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
     
     if not data or "model_name" not in data or not data["model_name"]:
         print("no data model name")
-        return go.Figure(),[],[]
+        return go.Figure(),[],[],[]
     
     prediction_var = generate_prediction_name(data["model_name"])
     #data for table section
@@ -174,7 +282,7 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
 
     if dfc is None or "_time" not in dfc:
         print("⚠ No data or missing '_time' column.")
-        return go.Figure(current_figure) if current_figure else go.Figure(),[],[]
+        return go.Figure(current_figure) if current_figure else go.Figure(),[],[],[]
 
     df = pd.DataFrame(dfc)
     df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
@@ -192,7 +300,8 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
             mode="lines",
             name=prediction_var,
             yaxis="y",
-            line=dict(color="black", dash="dash")
+            line=dict(color="black", dash="solid"),
+            hovertemplate="Time: %{x}<br>" + f"{prediction_var}: %{{y}}<extra></extra>"
         ))
         existing_traces.add(prediction_var)
         print(f"✅ Línea '{prediction_var}' agregada al eje principal.")
@@ -217,7 +326,8 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
                 mode="lines",
                 name=var,
                 yaxis=axis_id,
-                line=dict(color=color)
+                line=dict(color=color),
+                hovertemplate="Time: %{x}<br>" + f"{var}: %{{y}}<extra></extra>"
             ))
             existing_traces.add(var)
             print(f"✅ Variable '{var}' agregada al gráfico en eje {axis_id}.")
@@ -267,7 +377,7 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
     )
 
     print(f"📊 Gráfico finalizado con {len(fig.data)} trazas.")
-    return fig, table_data, table_columns
+    return fig, table_data, table_columns,table_data  
 
 @dash.callback(
     Output("time-slider-labels", "children"),
@@ -347,57 +457,53 @@ def update_table(add_click, remove_clicks, selected_variable, current_data):
 
 @dash.callback(
     Output("save-confirmation", "children"),
-    Input("store-selected-state", "data"),
-    Input("model-data-store", "data"),
     Input("confirm-save-btn", "n_clicks"),
+    State("store-selected-state", "data"),
+    State("model-data-store", "data"),
     State("prediction-table", "data"),
     State("clicked-report-info", "data"),
     State("dropdown-nivel", "value"),
     State("dropdown-tipo", "value"),
+    State("description-flagged", "value"),
     prevent_initial_call=True
 )
-def save_selected_row_to_influx(data_exp, data, n_clicks, table_data, row_data, nivel, tipo):
-    # Check if a row is selected
-    #if not table_data or row_index is None or row_index >= len(table_data):
-    #    return "⚠ Please select a row by clicking on it."
+def save_selected_row_to_influx(n_clicks, data_exp, data, table_data, row_data, nivel, tipo, desc_flag):
+    """
+    Save the selected row with anomaly tags and optional description.
+    """
+    if not row_data or "raw_time" not in row_data:
+        return "⚠ Please select a valid row by clicking Report."
 
-    prediction_var = generate_prediction_name(data["model_file"])
-    row = row_data
-    print(prediction_var)
-    # Ensure the required fields are present
-    if "raw_time" not in row:
-        return "❌ The selected row does not contain the required fields."
+    if not nivel or not tipo:
+        return "⚠ Please select both Level and Flag type."
 
     try:
-        # to save point Local file
-        value = row["raw_prediction"]
+        prediction_var = generate_prediction_name(data["model_file"])
+        value = row_data.get("raw_prediction")
+
         if value is None or value == "":
             return "⚠ The prediction value is empty."
 
-        # New point with the same data but with additional tags
-        point = {
-            "measurement": str(data_exp["selected_experiment"]),
-            "tags": {
-                "level": str(nivel),
-                "type": str(tipo),
-            },
-            "time": row["raw_time"],
-            "fields": {
-                prediction_var: float(value)
-            }
+        tags = {
+            "level": str(nivel),
+            "type": str(tipo)
         }
-        # NO update influx data
-        #influxdb_handler.update_point_tags_safe(data_exp["selected_experiment"],row["raw_time"],prediction_var,float(value),{"type": str(tipo), "level": str(nivel)})
+        if desc_flag:
+            tags["description"] = desc_flag
+        print(tags)
+        # Save in local SQLite (Influx optional)
         sqlite_handler.upsert_point(
             data_exp["selected_experiment"],
-            row["raw_time"],
+            row_data["raw_time"],
             prediction_var,
             float(value),
-            {"type": str(tipo), "level": str(nivel)}
+            tags
         )
+
         return "✅ Point saved with tags in SQLite."
+
     except Exception as e:
-        return f"❌ Error saving the point to InfluxDB: {e}"
+        return f"❌ Error saving the point: {e}"
     
 @dash.callback(
     Output("anomaly-warning", "style"),
@@ -469,7 +575,7 @@ def generate_excel_report(n_clicks,data, experiment_id, model_selected, time_ran
 
     info_dict = {
         "Experiment ID": [experiment_id],
-        "User": [experiment_id],
+        "User": ["Admin"],
         "Selected model": [model_selected],
         "Time range start": [time_range[0]],
         "Time range end": [time_range[1]],
@@ -531,7 +637,7 @@ def generate_excel_report(n_clicks,data, experiment_id, model_selected, time_ran
         # 2. Hacer el merge por timestamp
         df_transformed_pred = pd.merge(
             df_transformed_pred,
-            df_report[["time", "type", "level"]],
+            df_report[["time", "type", "level","description"]],
             left_on="Timestamp",
             right_on="time",
             how="left"

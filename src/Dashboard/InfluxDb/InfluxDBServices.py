@@ -350,37 +350,37 @@ class InfluxDBServices:
 
         Args:
             experiment_ID (str): The ID of the experiment.
-            time_range (str): The time range to query (default is "-90d").
+            time_range (str): Time range for the search (default "-100d").
 
         Returns:
-            float: Duration of the experiment in hours, or 0 if no data is found.
+            float: Duration in hours, or 0 if not found.
         """
         try:
-            # Query for the earliest time
+            # Query for earliest timestamp
             query_min_time = f"""
             from(bucket: "{self.connector.bucket}")
-            |> range(start: {time_range})
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(experiment_ID)}")
+            |> range(start: 0)
+            |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == "{experiment_ID}")
+            |> keep(columns: ["_time"])
             |> sort(columns: ["_time"], desc: false)
             |> limit(n: 1)
             """
 
-            # Query for the latest time
+            # Query for latest timestamp
             query_max_time = f"""
             from(bucket: "{self.connector.bucket}")
-            |> range(start: {time_range})
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(experiment_ID)}")
+            |> range(start: 0)
+            |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == "{experiment_ID}")
+            |> keep(columns: ["_time"])
             |> sort(columns: ["_time"], desc: true)
             |> limit(n: 1)
             """
-
-            # Execute queries
+            print(query_max_time)
+            # Execute
             result_min_time = self.connector.query_api.query(org=self.connector.org, query=query_min_time)
             result_max_time = self.connector.query_api.query(org=self.connector.org, query=query_max_time)
-
-            # Extract times
-            min_time, max_time = None, None
-
+            
+            # Parse times
             for table in result_min_time:
                 for record in table.records:
                     min_time = record.get_time()
@@ -389,19 +389,27 @@ class InfluxDBServices:
                 for record in table.records:
                     max_time = record.get_time()
 
-            # Check if both times are valid
+            print(f"[DEBUG] Min time: {min_time}, Max time: {max_time}")
+
             if min_time and max_time:
                 duration_in_seconds = (max_time - min_time).total_seconds()
-                return duration_in_seconds / 3600  # Convert seconds to hours
+                return duration_in_seconds / 3600
 
-            return 0.0  # Return 0 if no data is found
+            # Compute
+            if min_time and max_time:
+                duration_seconds = (max_time - min_time).total_seconds()
+                return round(duration_seconds / 3600, 2)  # Duration in hours
+
+            return 0.0
+
         except Exception as e:
-            print(f"Error in get_experiment_duration: {e}")
-            return None
+            print(f"[ERROR] get_experiment_duration: {e}")
+            return 0.0
 
     def get_data_for_table(self, experiment_ID, time_range="-100d"):
         """
         Fetch the data required for populating the DataTable, adding units based on the variable mapping.
+        Numeric values are rounded to 4 decimals when applicable.
         """
         try:
             queries = {
@@ -439,6 +447,7 @@ class InfluxDBServices:
                         variable_name = record.values.get("_field", "N/A")
                         unit = self.unit_mapping.get(variable_name, "N/A")
                         data_key = (record.values.get("type", "N/A"), variable_name)
+                        
                         if data_key not in data:
                             data[data_key] = {
                                 "Type": record.values.get("type", "N/A"),
@@ -448,12 +457,20 @@ class InfluxDBServices:
                                 "Max": "N/A",
                                 "Min": "N/A"
                             }
-                        data[data_key][key.capitalize()] = record.values.get("_value", "N/A")
+
+                        value = record.values.get("_value", "N/A")
+                        # Redondear si es numérico
+                        if isinstance(value, (int, float)):
+                            value = round(value, 4)
+
+                        data[data_key][key.capitalize()] = value
             
             return list(data.values())
+
         except Exception as e:
             logging.error(f"Error fetching data for table: {e}")
             return []
+
 
     def get_data_training(self, experiments_id, selected_metric):
         
@@ -710,28 +727,59 @@ class InfluxDBServices:
         except Exception as e:
             print("❌ Error in safe update:", e)
 
-    def get_online_experiments_summary(self, minutes=5):
+    def get_online_experiments_summary(self, time_unit="minutes", time_value=5):
         """
-        Resumen de experimentos online: Batch size y Yields, basado en los últimos minutos.
+        Retrieves a summary of online experiments based on the specified time window.
+
+        Args:
+            time_unit (str): Time unit for filtering ('seconds', 'minutes', 'hours', 'days', 'months').
+            time_value (int): Numeric value representing the amount of time to look back.
+
+        Returns:
+            list: List of dictionaries summarizing experiment data (ID, Date, Batch Size, Yields, Temperature).
         """
         try:
+            if not time_unit or not time_value:
+                print("[WARNING] Invalid time range parameters.")
+                return []
+
+            # Map full unit to InfluxDB shorthand
+            unit_map = {
+                "seconds": "s",
+                "minutes": "m",
+                "hours": "h",
+                "days": "d",
+                "months": "mo"
+            }
+
+            if time_unit not in unit_map:
+                print(f"[WARNING] Unsupported time unit: {time_unit}")
+                return []
+
+            shorthand = unit_map[time_unit]
             flux_query = f"""
             from(bucket: "{self.connector.bucket}")
-            |> range(start: -{minutes}m)
+            |> range(start: -{time_value}{shorthand})
             |> filter(fn: (r) => exists r["_measurement"])
             |> group(columns: ["_measurement"])
             |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
             """
 
-            df = self.connector.query_api.query_data_frame(flux_query)
+            result = self.connector.query_api.query_data_frame(flux_query)
 
+            if isinstance(result, list):
+                if not result:
+                    #print("[INFO] No recent data found.")
+                    return []
+                df = pd.concat(result, ignore_index=True)
+            else:
+                df = result
             if df.empty:
-                print("[INFO] No recent data found.")
+                #print("[INFO] No recent data found.")
                 return []
 
-            # Asegúrate que exista experiment_id
             if "_measurement" not in df.columns:
-                print("[WARNING] No experiment_id field found.")
+                print("[WARNING] No experiment ID field found.")
                 return []
 
             experiment_ids = df["_measurement"].unique()
@@ -739,23 +787,18 @@ class InfluxDBServices:
 
             for exp_id in experiment_ids:
                 df_exp = df[df["_measurement"] == exp_id]
-                
                 batch_size = int(df_exp.shape[0])
+                start_time = df_exp["_time"].min()
+                end_time = df_exp["_time"].max()
 
-                real_vars = [col for col in df_exp.columns if not col.startswith("pred_") and col not in ["result", "table", "_start", "_stop", "_time", "_measurement", "experiment_id"]]
-                yields = int(len(real_vars))
-
-                temperature = float(df_exp["temperature"].mean()) if "temperature" in df_exp.columns else "N/A"
-
-                last_date = df_exp["_time"].max()
-                last_date_str = pd.to_datetime(last_date).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(last_date) else "N/A"
+                start_str = pd.to_datetime(start_time).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(start_time) else "N/A"
+                end_str = pd.to_datetime(end_time).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(end_time) else "N/A"
 
                 results.append({
                     "Experiment ID": exp_id,
-                    "Date": last_date_str,
-                    "Batch size": batch_size,
-                    "Yields": yields,
-                    "Temperature": round(temperature, 2) if isinstance(temperature, (float, int)) else "N/A"
+                    "Start Time": start_str,
+                    "End Time": end_str,
+                    "Batch size": batch_size
                 })
 
             return results
@@ -763,6 +806,7 @@ class InfluxDBServices:
         except Exception as e:
             print(f"[ERROR] get_online_experiments_summary: {e}")
             return []
+
 
     def get_previous_experiments_summary(self, minutes=5):
         """
@@ -834,6 +878,41 @@ class InfluxDBServices:
             print(f"[ERROR] get_previous_experiments_summary: {e}")
             return []
 
+    def get_recent_data_for_graph(self):
+        """
+        Fetches all available experiment data for the time series graph.
 
+        Returns:
+            pd.DataFrame: DataFrame with columns: _time, _measurement, and variables of interest.
+        """
+        try:
+            flux_query = f"""
+            from(bucket: "{self.connector.bucket}")
+            |> range(start: 0)  // Get all data from the beginning
+            |> filter(fn: (r) => exists r["_measurement"])
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            """
 
+            result = self.connector.query_api.query_data_frame(flux_query)
 
+            if isinstance(result, list):
+                if not result:
+                    print("[INFO] No data found in the database.")
+                    return pd.DataFrame()
+                df = pd.concat(result, ignore_index=True)
+            else:
+                df = result
+
+            if df.empty:
+                print("[INFO] No data found in the database.")
+                return pd.DataFrame()
+
+            if "_time" not in df.columns or "_measurement" not in df.columns:
+                print("[WARNING] Required fields are missing.")
+                return pd.DataFrame()
+
+            return df
+
+        except Exception as e:
+            print(f"[ERROR] get_recent_data_for_graph: {e}")
+            return pd.DataFrame()

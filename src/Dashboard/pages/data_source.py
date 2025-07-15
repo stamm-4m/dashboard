@@ -2,6 +2,8 @@ from dash import html,dcc, dash_table
 import dash_bootstrap_components as dbc
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_global import disabled_figure
+from Dashboard.config import NAME_PROJECT
+
 
 def data_source_layout():
         
@@ -13,11 +15,13 @@ def data_source_layout():
 
         experiment_columns = [
             {"name": "Experiment ID", "id": "Experiment ID"},
-            {"name": "Date", "id": "Date"},
-            {"name": "Batch size", "id": "Batch size"},
-            {"name": "Temperature", "id": "Temperature"},
-            {"name": "Yields", "id": "Yields"},
+            {"name": "Start Time", "id": "Start Time"},
+            {"name": "End Time", "id": "End Time"},
+            {"name": "Batch size", "id": "Batch size"}
         ]
+
+        time_units = ["seconds", "minutes", "hours", "days", "months"]
+
 
         return dbc.Container([
             dbc.Row([
@@ -25,8 +29,12 @@ def data_source_layout():
                     html.Div([
                         html.H5("Data source", className="fw-bold d-inline")
                     ], className="d-flex align-items-left"),
+                    dcc.Interval(
+                        id='interval-component',
+                        interval=5 * 1000,  # 5 segundos
+                        n_intervals=0
+                    ),
                     dbc.Label("Please choose an Experiment ID to load the available models:", className="fw-bold"),
-                    dbc.Label("Experiment ID:", className="fw-bold"),
                     dcc.Dropdown(
                         id="experiment-dropdown",
                         placeholder="Select Experiment ID",
@@ -36,14 +44,51 @@ def data_source_layout():
                         persistence_type="local"
                     ),
                     # Row for model details
+                    html.H5(f"Project name: {NAME_PROJECT}", className="fw-bold"),
                     dbc.Label("Project description:", className="fw-bold"),
                     dbc.Row(
                         
                         html.Div(id='project-details')
                         
                     ),
+
+                    #Summary report
+                    html.H5("Statistical summary", className="text-left mt-4"),
+                    html.Div("Duration: N/A", id="duration-text", className="fw-bold text-primary fs-5 mb-3"),
+                    html.Div(id="table-title-container",style={"textAlign": "center", "marginTop": "10px"}),
+                    dash_table.DataTable(
+                        id="data-table",
+                        columns=[
+                            {"name": "Type", "id": "Type"},
+                            {"name": "Name", "id": "Name"},
+                            {"name": "Unit", "id": "Unit"},
+                            {"name": "Mean", "id": "Mean"},
+                            {"name": "Max", "id": "Max"},
+                            {"name": "Min", "id": "Min"}
+                        ],
+                        data=example_data,
+                        page_size=10,
+                    ),
+
+                    html.H5("Time Unit for 'Last Measurement'", className="text-left mt-4"),
+                    html.Div([
                     # Tabla Experimentos Online
-                    html.H5("Experiments online (mean values)", className="text-center mt-4"),
+                    dbc.Input(
+                        id='time-value-selector',
+                        type='number',
+                        min=1,
+                        value=5,
+                    ),
+                    dcc.Dropdown(
+                        id='time-unit-selector',
+                        options=[{"label": unit.capitalize(), "value": unit} for unit in time_units],
+                        value="minutes",
+                        clearable=False,
+                    ),
+                    ], style={
+                        
+                    }),
+                    dbc.Alert(id="experiment-message", is_open=False, duration=8000),
                     html.Div([
                         dash_table.DataTable(
                             id="table-experiments-online",
@@ -54,50 +99,30 @@ def data_source_layout():
                         )
                     ], className="mb-4"),
 
-                    # Tabla Experimentos Previos
-                    html.H5("Previous experiments (mean values)", className="text-center mt-4"),
-                    html.Div([
-                        dash_table.DataTable(
-                            id="table-experiments-previous",
-                            columns=experiment_columns,
-                            data=[],
-                            page_size=5,
-                            style_table={"overflowX": "auto"},
-                        )
-                    ], className="mb-4"),
+                    # Data by experiment
+                    html.H5("Valid Data Points Over Time"),
+                    dbc.Label("Interval value"),
+                    dbc.Input(id="interval-value", type="number", value=10, min=1, step=1),
+                    dcc.Dropdown(
+                        id='time-unit-interval',
+                        options=[{"label": unit.capitalize(), "value": unit} for unit in time_units],
+                        value="minutes",
+                        clearable=False,
+                    ),
+                    dbc.Label("Field(s) to count"),
+                    dcc.Dropdown(
+                        id="field-selector",
+                        options=[],
+                        value="all",
+                        clearable=False
+                    ),
+                    dcc.Graph(id='line-experiments', figure=disabled_figure),
 
-                ], width=5, className="p-3 bg-light rounded-3 shadow-sm"),
-                
-                dbc.Col([
-                    dcc.Graph(id="bar-chart", figure=disabled_figure),
-                    dcc.Graph(id='histogram_experiments', figure=disabled_figure),
-                    dcc.Store(id='prev_experiment_ids', data={}),
-                    dcc.Interval(
-                        id='interval-component',
-                        interval=5 * 1000,  # 5 segundos
-                        n_intervals=0
-                    )
-                ], width=7, className="shadow-sm")
+
+                ], width=12, className="p-3 bg-light rounded-3 shadow-sm"),
             ], className="my-4"),
 
             dbc.Row([
-                    
-                html.Div("Duration: N/A", id="duration-text", className="fw-bold text-primary fs-5 mb-3")
-            ]),
-
-            dbc.Row([
-                dash_table.DataTable(
-                    id="data-table",
-                    columns=[
-                        {"name": "Type", "id": "Type"},
-                        {"name": "Name", "id": "Name"},
-                        {"name": "Unit", "id": "Unit"},
-                        {"name": "Mean", "id": "Mean"},
-                        {"name": "Max", "id": "Max"},
-                        {"name": "Min", "id": "Min"}
-                    ],
-                    data=example_data,
-                    page_size=10,
-                )
-            ])
+                
+            ], className="my-4"),
         ], fluid=True)

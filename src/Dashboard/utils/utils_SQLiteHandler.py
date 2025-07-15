@@ -55,28 +55,39 @@ class SQLiteHandler:
                     time TEXT,
                     type TEXT,
                     level TEXT,
+                    description TEXT,  
                     PRIMARY KEY (measurement, prediction_var, time)
                 )
             ''')
             conn.commit()
 
     def upsert_point(self, measurement, time, prediction_var, value, tags: dict):
-        with sqlite3.connect(self.db_path) as conn:
+        """
+        Inserts or updates a point in the local SQLite database with optional tags.
+        """
+        db_path = os.path.join(self.db_path, "point_report.db")
+        
+        with sqlite3.connect(db_path) as conn:
             c = conn.cursor()
+            
             c.execute('''
-                INSERT INTO point_report (measurement, prediction_var, value, time, type, level)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO point_report (measurement, prediction_var, value, time, type, level, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(measurement, prediction_var, time)
                 DO UPDATE SET
                     value = excluded.value,
                     type = excluded.type,
-                    level = excluded.level
+                    level = excluded.level,
+                    description = excluded.description
             ''', (
                 str(measurement),
                 str(prediction_var),
                 float(value),
                 str(time),
                 tags.get("type", None),
-                tags.get("level", None)
+                tags.get("level", None),
+                tags.get("description", None)
             ))
+            
             conn.commit()
+
