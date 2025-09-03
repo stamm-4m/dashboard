@@ -352,6 +352,18 @@ more-itertools = ">=10.6.0"
 pydantic = ">=2.10.6"
 
 [[package]]
+name = "dash-html-components"
+version = "2.0.0"
+description = "Vanilla HTML components for Dash"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "dash_html_components-2.0.0-py3-none-any.whl", hash = "sha256:b42cc903713c9706af03b3f2548bda4be7307a7cf89b7d6eae3da872717d1b63"},
+    {file = "dash_html_components-2.0.0.tar.gz", hash = "sha256:8703a601080f02619a6390998e0b3da4a5daabe97a1fd7a9cebc09d015f26e50"},
+]
+
+[[package]]
 name = "dataclass-wizard"
 version = "0.35.0"
 description = "Lightning-fast JSON wizardry for Python dataclasses — effortless serialization right out of the box!"
@@ -1863,4 +1875,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "3.12"
-content-hash = "13385a69e9225ce392ca660a8bca4a079c05b475aa1bccd37f3867277c202767"
+content-hash = "404cdd93a571c85c232318498b1b22007f77b4b349d1f9e34b058bf1c6d42517"

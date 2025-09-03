@@ -1,0 +1,141 @@
+performance_estimators:
+  - name: "Mean Absolute Error"
+    acronym: "MAE"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Mean Absolute Error (MAE) measures the average absolute difference between the predictions of two models. A higher MAE indicates a higher level of disagreement between the models."
+    method:
+      formula: "MAE = (1/n) * Σ |Prediction_1 - Prediction_2|"
+      thresholds:
+        low: "< 0.1: Low disagreement"
+        moderate: "0.1 <= MAE < 0.25: Moderate disagreement"
+        high: ">= 0.25: High disagreement, models are not aligned"
+    configuration:
+      method_parameters:
+        - name: "n"
+          description: "The number of data points used to calculate the error."
+          default: "Length of the input data"
+    implementation_notes:
+      - "Ensure that the predictions from both models are in the same scale for accurate comparison."
+      - "MAE is sensitive to the magnitude of prediction errors but does not account for the direction of errors."
+      
+  - name: "Root Mean Squared Error"
+    acronym: "RMSE"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Root Mean Squared Error (RMSE) calculates the square root of the average squared differences between the predictions of two models. It penalizes larger errors more heavily than smaller ones."
+    method:
+      formula: "RMSE = √( (1/n) * Σ (Prediction_1 - Prediction_2)² )"
+      thresholds:
+        low: "< 0.1: Low disagreement, models are aligned"
+        moderate: "0.1 <= RMSE < 0.25: Moderate disagreement"
+        high: ">= 0.25: High disagreement, requires attention"
+    configuration:
+      method_parameters:
+        - name: "n"
+          description: "The number of data points used to calculate the error."
+          default: "Length of the input data"
+    implementation_notes:
+      - "RMSE is more sensitive to large errors compared to MAE, making it more suitable when large discrepancies between models need to be highlighted."
+      - "RMSE assumes that prediction errors follow a normal distribution and are equally weighted."
+      
+  - name: "Mean Squared Error"
+    acronym: "MSE"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Mean Squared Error (MSE) calculates the average of the squared differences between the predictions of two models. Like RMSE, it penalizes larger errors but does not take the square root."
+    method:
+      formula: "MSE = (1/n) * Σ (Prediction_1 - Prediction_2)²"
+      thresholds:
+        low: "< 0.1: Low disagreement"
+        moderate: "0.1 <= MSE < 0.25: Moderate disagreement"
+        high: ">= 0.25: High disagreement"
+    configuration:
+      method_parameters:
+        - name: "n"
+          description: "The number of data points used to calculate the error."
+          default: "Length of the input data"
+    implementation_notes:
+      - "MSE amplifies large errors due to squaring the differences. Be mindful of outliers in the data."
+      - "This method is commonly used when errors need to be treated quadratically."
+      
+  - name: "Pearson Correlation Coefficient"
+    acronym: "PCC"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Pearson Correlation Coefficient (r) measures the linear relationship between the predictions of two models. A low value indicates a significant disagreement, while a high value suggests alignment."
+    method:
+      formula: "r = Σ[(Prediction_1 - mean(Prediction_1)) * (Prediction_2 - mean(Prediction_2))] / √(Σ(Prediction_1 - mean(Prediction_1))² * Σ(Prediction_2 - mean(Prediction_2))²)"
+      thresholds:
+        low: "< 0.3: Low correlation, high disagreement"
+        moderate: "0.3 <= r < 0.7: Moderate correlation, some disagreement"
+        high: ">= 0.7: High correlation, models are aligned"
+    configuration:
+      method_parameters:
+        - name: "mean"
+          description: "The mean of the prediction values for each model."
+          default: "Calculated from the predictions"
+    implementation_notes:
+      - "Pearson's correlation is sensitive to linear relationships. Non-linear relationships may not be detected."
+      - "A value near 0 suggests no linear correlation, while values closer to ±1 indicate strong linear correlation."
+      
+  - name: "Variance of Prediction Differences"
+    acronym: "VPD"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Variance of Prediction Differences measures the variability in the differences between model predictions. A high variance indicates greater disagreement between the models."
+    method:
+      formula: "VPD = (1/n) * Σ (Prediction_1 - Prediction_2)²"
+      thresholds:
+        low: "< 0.1: Low disagreement, models are consistent"
+        moderate: "0.1 <= VPD < 0.25: Moderate disagreement"
+        high: ">= 0.25: High disagreement, significant variability"
+    configuration:
+      method_parameters:
+        - name: "n"
+          description: "The number of data points used to calculate the variance."
+          default: "Length of the input data"
+    implementation_notes:
+      - "Variance captures the spread of prediction differences. Be cautious of outliers which can inflate the variance."
+      - "This method is useful for detecting changes in prediction behavior over time."
+      
+  - name: "Coefficient of Variation"
+    acronym: "CV"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "The Coefficient of Variation (CV) is the ratio of the standard deviation to the mean of prediction differences. It is a normalized measure of the variability in prediction differences."
+    method:
+      formula: "CV = (σ(Prediction_1 - Prediction_2)) / mean(Prediction_1 - Prediction_2)"
+      thresholds:
+        low: "< 0.1: Low variation, models are stable"
+        moderate: "0.1 <= CV < 0.25: Moderate variation"
+        high: ">= 0.25: High variation, models showing substantial instability"
+    configuration:
+      method_parameters:
+        - name: "σ"
+          description: "The standard deviation of the prediction differences."
+          default: "Calculated from the differences"
+    implementation_notes:
+      - "CV normalizes the prediction variance by the mean, making it useful when comparing models across different scales."
+      - "A high CV suggests that one model might be less stable or more sensitive to input variations than another."
+      
+  - name: "Cosine Similarity"
+    acronym: "CosSim"
+    version: "1.0"
+    type: "model_disagreement"
+    description: "Cosine Similarity measures the cosine of the angle between the prediction vectors, which is used for comparing the directionality of two model predictions."
+    method:
+      formula: "CosSim = (Σ (Prediction_1 * Prediction_2)) / (√Σ (Prediction_1)² * √Σ (Prediction_2)²)"
+      thresholds:
+        low: "< 0.3: Low similarity, high disagreement"
+        moderate: "0.3 <= CosSim < 0.7: Moderate similarity"
+        high: ">= 0.7: High similarity, models are aligned"
+    configuration:
+      method_parameters:
+        - name: "Prediction_1, Prediction_2"
+          description: "The two sets of predictions being compared."
+          default: "Input model predictions"
+    implementation_notes:
+      - "Cosine similarity focuses on the directionality of the prediction vectors. It is less sensitive to magnitude differences."
+      - "Cosine similarity is particularly useful when comparing predictions in high-dimensional spaces."
+

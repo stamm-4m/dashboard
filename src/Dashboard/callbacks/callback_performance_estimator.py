@@ -6,10 +6,10 @@ import plotly.graph_objs as go
 import pandas as pd
 import numpy as np
 import re
-
+import logging
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils import model_information
-from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models
+from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models,load_estimator_descriptions,compute_metric
 from Dashboard.utils.utils_global import disabled_figure, generate_prediction_name
 #from drift_detectors_pack.drift_detectors.drift_detector import DisagreementMetricLoader
 
@@ -76,7 +76,7 @@ def update_estimator_section(selected_metric):
         return html.Div()  # If no metric is selected, return an empty div
 
     # Get information about the selected STIMAROE
-    metric_info = model_information.load_estimator_descriptions(selected_metric)
+    metric_info = load_estimator_descriptions(selected_metric)
     if not metric_info:
         return html.Div(html.P("No information available for this performance estimator."))
 
@@ -168,7 +168,7 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
     # **Case 1: Add Thresholds**
     if triggered_id == "performance-estimator-dropdown" and selected_metric:
         fig = go.Figure()
-        metric_info = model_information.load_estimator_descriptions(selected_metric)
+        metric_info = load_estimator_descriptions(selected_metric)
         if metric_info:
             # Define colors according to the threshold level
             threshold_colors = {"low": "green", "moderate": "orange", "high": "red"}
@@ -222,8 +222,12 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
 
         if name_prediction1 in df_bach.columns and name_prediction2 in df_bach.columns:
             # Select the last `n` values
-            y_true = df_bach[name_prediction1].iloc[-n:]
-            y_pred = df_bach[name_prediction2].iloc[-n:]
+            #y_true = df_bach[name_prediction1].iloc[-n:]
+            #y_pred = df_bach[name_prediction2].iloc[-n:]
+            # Select the first n values
+            y_true = df_bach[name_prediction1].iloc[:n]
+            y_pred = df_bach[name_prediction2].iloc[:n]
+
 
             # Check for NaN values and remove them
             df_valid = pd.DataFrame({"y_true": y_true, "y_pred": y_pred}).dropna()
@@ -234,43 +238,45 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
             y_true = df_valid["y_true"]
             y_pred = df_valid["y_pred"]
 
-            print("y_true", y_true.to_list())
-            print("y_pred", y_pred.to_list())
+            #print("y_true", y_true.to_list())
+            #print("y_pred", y_pred.to_list())
             print("Selected metric:", selected_metric)
 
             # Dictionary of pointwise metrics
             pointwise_metrics = {
-                "VPD"
+                "VPD",
+                "MAE",
+                "MSE",
+                "RMSE",
             }
 
             # Dictionary of global metrics (return a single value)
             constant_metrics = {
-                "MSE",
-                "MAE",
                 "PCC",
-                "RMSE",
                 "CosSim",
                 "CV"
             }
             
-            #loader = DisagreementMetricLoader()
-            #metric = loader.get_metric(selected_metric)
-            #value = metric.compute(y_true,y_pred)
-            value = 0.0
+            value = compute_metric(selected_metric,y_true,y_pred)
+            print("resultado:",value)
+            mode="lines+markers"
             if selected_metric in pointwise_metrics:
-                # nothing
+                # Pointwise metrics → vector con un valor por cada punto
                 metric_values = value
-                print("metric selected compute value is pointwise")
+                mode = 'markers'  # o 'lines+markers' si quieres unir
             elif selected_metric in constant_metrics:
-                print("metric selected compute value is constant")
-                metric_values = [value] * len(y_true)  # Repeat across all points
+                # Constant metrics → un único valor repetido para todos los puntos
+                metric_values = [value] * len(y_true)
+                mode = 'lines'  # Línea horizontal
             else:
                 print(f"❌ Metric '{selected_metric}' not supported.")
                 return fig
+
             
-            
-            
-            print(f"{metric.name} ({metric.acronym}): {value:.4f}")
+            if metric_values is None or len(metric_values) == 0:
+                print(f"⚠️ No metric values computed for {selected_metric}. Skipping plot.")
+                return fig
+            #print(f"{metric.name} ({metric.acronym}): {value:.4f}")
 
             # Remove previous traces of the same metric to avoid accumulation
             fig.data = [trace for trace in fig.data if trace.name != f"{selected_metric} {name_prediction2}"]
@@ -279,9 +285,10 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
 
             # Add the new trace for the selected metric
             fig.add_trace(go.Scatter(
-                x=list(range(1, len(metric_values) + 1)),  # Positions 1, 2, ..., n
+                #x=list(range(1, len(metric_values) + 1)),  # Positions 1, 2, ..., n
+                x=metric_values.index.tolist(),
                 y=metric_values,
-                mode="lines+markers",
+                mode=mode,
                 name=f"{selected_metric} {name_prediction2}",
                 line=dict(color=color, dash="dot"),  # Dotted line
                 marker=dict(symbol="diamond", size=8, color=color)  # Diamond marker with assigned color
@@ -291,15 +298,82 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
             fig.update_layout(
                 xaxis=dict(title="Last elements"),
                 yaxis=dict(title=selected_metric),
-                yaxis_range=[0, max(metric_values) + 1] if selected_metric not in ["PCC", "CosSim"] else None,  # Adjust only if necessary
+                yaxis_range=[
+                    min(0, float(np.min(metric_values))),  # Si hay negativos, muestra
+                    float(np.max(metric_values)) + 1
+                ] if selected_metric not in ["PCC", "CosSim"] else None,
                 legend=dict(
-                    orientation="h",  # Horizontal legend mode
-                    yanchor="top",  # Top anchor
-                    y=-0.2,  # Move the legend downward
-                    xanchor="center",  # Center the legend
-                    x=0.5  # Position the legend at the horizontal center
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5
                 )
             )
 
     return fig
-        
+
+@dash.callback(
+    Output("metrics-table", "data"),   # Actualiza la tabla con métricas punto a punto
+    Output("metrics-div", "children"), # Muestra métricas constantes
+    Input("soft-sensor-input", "value"),  # model_selected
+    State("store-selected-state", "data"),  # experiment_id
+    State("model-data-store", "data"),      # model_data_selected
+    State("metrics-table", "children"),     # Tabla anterior
+    prevent_initial_call=True
+)
+def update_metrics_table(model_selected, experiment_id, model_data_selected, existing_table):
+    if not model_selected or not model_data_selected or not experiment_id:
+        logging.warning("no_update: not model_selected or not model_data_selected or not experiment_id")
+        return dash.no_update, ""
+
+    # ✅ Obtener nombres de predicciones y datos del batch
+    name_file_model = model_information.get_configuration_by_model_name(model_selected)['model_description']['config_files']['model_file']
+    name_prediction1 = generate_prediction_name(model_data_selected["model_file"])
+    name_prediction2 = generate_prediction_name(name_file_model)
+
+    df_bach = influxdb_handler.get_data_by_batch_id2(experiment_id["selected_experiment"])
+
+    if name_prediction1 in df_bach.columns and name_prediction2 in df_bach.columns:
+        y_true = df_bach[name_prediction1]
+        y_pred = df_bach[name_prediction2]
+
+        # ✅ Eliminar NaN
+        df_valid = pd.DataFrame({"y_true": y_true, "y_pred": y_pred}).dropna()
+        if df_valid.empty:
+            return [], html.Div("⚠️ All values contain NaN, unable to compute metrics.")
+
+        y_true = df_valid["y_true"]
+        y_pred = df_valid["y_pred"]
+
+        # ✅ Reconstruir DataFrame si ya existía
+        if existing_table:
+            df = pd.DataFrame(existing_table)
+        else:
+            df = pd.DataFrame({name_prediction1: y_true, name_prediction2: y_pred})
+
+        # ✅ Métricas punto a punto (MAE, MSE, RMSE)
+        selected_metrics = ["MAE", "MSE", "RMSE"]
+        for metric in selected_metrics:
+            result = compute_metric(metric, y_true, y_pred)
+            if isinstance(result, (list, np.ndarray, pd.Series)):
+                result = np.round(result, 4)
+                print("resultado:",result)
+            elif isinstance(result, float):
+                result = round(result, 4)
+            df[metric] = result
+
+        # ✅ Métricas constantes (PCC, CosSim, CV)
+        constant_metrics = ["PCC", "COSSIM", "CV"]
+        metrics_values = []
+        for metric in constant_metrics:
+            value = compute_metric(metric, y_true.to_numpy(), y_pred.to_numpy())
+            metrics_values.append(html.P(f"{metric}: {round(value, 4)}"))
+
+        # ✅ Retornar datos para DataTable y HTML con métricas constantes
+        df_reset = df.reset_index().rename(columns={"index": "Point"})
+        return df_reset.to_dict("records"), html.Div(metrics_values)
+        #return df.to_dict("records"), html.Div(metrics_values)
+
+    # Si no hay columnas válidas
+    return [], html.Div("⚠️ No valid predictions found.")

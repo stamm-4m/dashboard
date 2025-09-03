@@ -127,7 +127,7 @@ class InfluxDBServices:
                 # Query to retrieve unique experiment_ID
                 query = f"""
                 from(bucket: "{self.connector.bucket}")
-                |> range(start: -90d)
+                |> range(start: 0)
                 |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Asegura que experiment_ID existe
                 |> keep(columns: ["{str(BACH_ID)}"])
                 |> distinct(column: "{str(BACH_ID)}")
@@ -473,49 +473,85 @@ class InfluxDBServices:
 
 
     def get_data_training(self, experiments_id, selected_metric):
+        if not experiments_id:
+            return []
+        print("selected_metric",selected_metric)
+        # Filtro por métrica si se selecciona una
+        metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
+
+        # Consulta Flux
+        query = f'''
+            from(bucket: "{self.connector.bucket}")
+                |> range(start: 0)
+                |> filter(fn: (r) => {" or ".join(f'r["{str(BACH_ID)}"] == "{str(e)}"' for e in experiments_id)})
+                {metric_filter}
+                |> keep(columns: ["_time", "_value", "_field"])
+                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"])
+        '''
+        # Ejecutar consulta
+        result = self.connector.query_api.query(org=self.connector.org, query=query)
         
-        if not experiments_id or not selected_metric:
+        # Extraer nombres de columnas y registros
+        records = [record.values for table in result for record in table.records]
+        #print("records",records)
+
+        if not records:
             return []
 
-        # Formar la consulta Flux para obtener los valores
-        query = f"""
-            from(bucket: "{self.connector.bucket}")
-                |> range(start: -90d)  
-                |> filter(fn: (r) => r["_field"] == "{selected_metric}")
-                |> filter(fn: (r) => {" or ".join(f'r["{str(BACH_ID)}"] == "{str(e)}.0"' for e in experiments_id)})
-                |> keep(columns: ["_value"])
-        """
-        #print("query training:",query)
-        # Ejecutar la consulta
-        result = self.connector.query_api.query(org=self.connector.org, query=query)
+        # Obtener solo las columnas numéricas (excluyendo "_time" y tags)
+        value_keys = [key for key in records[0].keys() if key not in ["_time", "result", "table"]]
 
-        # Extraer solo los valores numéricos
-        values = [record.get_value() for table in result for record in table.records]
+        # Construir array 2D
+        data = [[rec.get(k, float('nan')) for k in value_keys] for rec in records]
 
-        return values
+        return data
 
+    
     def get_data_test(self, experiment_id, selected_metric):
         try:
-            if not experiment_id or not selected_metric:
-                raise ValueError("The experiment_id and the metric cannot be None or empty.")
+            if not experiment_id:
+                raise ValueError("The experiment_id cannot be None or empty.")
 
-            # Flux query to retrieve only the selected metric values
+            # Filtro por métrica solo si se proporciona
+            metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
+
+            # Flux query
             query = f"""
-            from(bucket: "{self.connector.bucket}")
-                |> range(start: -90d)  // Adjust the time range as needed
-                |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(experiment_id)}")
-                |> filter(fn: (r) => r["_field"] == "{selected_metric}")
-                
+                from(bucket: "{self.connector.bucket}")
+                    |> range(start: 0)
+                    |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(experiment_id)}")
+                    {metric_filter}
+                    |> keep(columns: ["_field", "_value"])
             """
-            #|> keep(columns: ["_value"])
-            #print("query test:",query)
-            # Execute query
+
+            # Ejecutar la consulta
             result = self.connector.query_api.query(query=query)
 
-            # Extract only the numerical values
-            values = [record.get_value() for table in result for record in table.records]
+            # Agrupar valores por _field
+            field_values = {}
+            for table in result:
+                for record in table.records:
+                    field = record.get_field()
+                    value = record.get_value()
+                    field_values.setdefault(field, []).append(value)
 
-            return values if values else []
+            if not field_values:
+                return []
+
+            # Ajustar longitudes (rellenar con NaN donde falten datos)
+            import numpy as np
+            max_len = max(len(values) for values in field_values.values())
+            for field, values in field_values.items():
+                if len(values) < max_len:
+                    # Rellenar con NaN hasta que alcance max_len
+                    field_values[field].extend([np.nan] * (max_len - len(values)))
+
+            # Armar array 2D (cada columna es un _field, cada fila una observación)
+            sorted_fields = sorted(field_values.keys())
+            matrix = np.column_stack([field_values[field] for field in sorted_fields])
+
+            return matrix
 
         except Exception as e:
             print(f"Error retrieving test data for experiment_id {experiment_id}: {e}")

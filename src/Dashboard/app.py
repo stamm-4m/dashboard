@@ -7,11 +7,16 @@ import sys
 import flask
 import os
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(levelname)s:%(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+# Cambiar el logger raíz
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+# Evitar múltiples handlers si se recarga
+if not root_logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(levelname)s:%(message)s')
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
 
 # Create the Flask server
 server = flask.Flask(__name__)

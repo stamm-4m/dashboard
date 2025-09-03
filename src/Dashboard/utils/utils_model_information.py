@@ -4,9 +4,8 @@ import pandas as pd
 import logging
 from Dashboard.config import BASE_URL_API
 from Dashboard.utils.utils_apiclient import ApiClient
-from io import StringIO
-#from Dashboard.drift_detectors_pack.drift_detectors import metadata
-#from Dashboard.drift_detectors_pack.drift_detectors import DisagreementMetricLoader
+
+
 
 
 
@@ -226,24 +225,6 @@ class ModelInformation:
             if filename.endswith(".yaml") or filename.endswith(".yml"):
                 filepath = os.path.join(folder_path, filename)
                 self.load_yaml_file_monitoring(filepath)
-
-    def get_metrics_score_options(self):
-        #self.load_multiple_yaml_files_monitoring("../Monitoring/data_drift_detectors")
-        try:
-            # Read the string into a DataFrame using pipe (|) as separator
-            df = parse_markdown_table(metadata.generate_markdown_table())
-            
-            # Access columns
-            
-            print(df["Class"].str.strip())  # Access the 'Class' column
-            
-            metrics = set(df["Class"])  # Use a set to avoid duplicate values
-        except Exception as e:
-            logging.error(f"Error processing metadata score metrics: {e}")
-
-        # Convert unique values into a list of dictionaries
-        return [{"label": metric, "value": metric} for metric in sorted(metrics)]
-    
     
     # Gets all unique categories from the 'type' field within inputs.
     def get_unique_types_models(self, model_name):
@@ -294,53 +275,6 @@ class ModelInformation:
             except Exception as e:
                 print(f"Error processing get name input: {e}")
 
-    def get_performance_estimators_options(self):
-        estimators = set()
-        metric_load =  DisagreementMetricLoader()
-        
-        try:
-            # Extract the list of detectors from the configuration
-            drift_detectors = metric_load.data.get('drift_detector', [])
-                
-            if isinstance(drift_detectors, list):
-                for detector in drift_detectors:
-                    name = detector.get('name')
-                    acronym = detector.get('acronym')
-                    if name and acronym:  # Ensure both values exist
-                        estimators.add((name, acronym))
-        except Exception as e:
-            logging.error(f"Error processing configuration estimator: {e}")
-
-        # Convert unique values into a list of dictionaries
-        return [{"label": acronym, "value": acronym} for name, acronym in sorted(estimators)]
-    
-    def load_estimator_descriptions(self, selected_estimator):
-        # Default values in case the metric is not found
-        default_response = {
-            "name": "Unknown Metric",
-            "method": {},
-            "configuration": {},
-            "implementation_notes": []
-        }
-
-        metric_load =  DisagreementMetricLoader()
-        try:
-            drift_detectors = metric_load.data.get('drift_detector', [])
-                
-            if isinstance(drift_detectors, list):
-                for detector in drift_detectors:
-                    if detector.get("acronym") == selected_estimator:
-                        return {
-                                "name": detector.get("name", "Unknown Metric"),
-                                "method": detector.get("method", {}),
-                                "configuration": detector.get("configuration", {}),
-                                "implementation_notes": detector.get("implementation_notes", [])
-                            }
-        except Exception as e:
-            logging.error(f"Error retrieving metric information {selected_estimator}: {e}")
-        
-        logging.warning(f"Metric not found: {selected_estimator}. Available data: {drift_detectors}")
-        return default_response
     
     def project_details(self):
         """Get projetc details information"""
@@ -349,26 +283,3 @@ class ModelInformation:
             return response
         except Exception as e:
             print(f" Error get project details data: {e}")
-
-    def get_information_algorith(self,score):
-        result = []
-        if score == "PSI":
-            #result = get_algorithm_info(score)
-            return result
-
-        if score == "ADWIN":
-            #result = get_algorithm_info(score)
-            print("ADWIN info:", result)
-            return result
-        
-def parse_markdown_table(markdown_str: str) -> pd.DataFrame:
-    # Convert the markdown string to a DataFrame
-    df = pd.read_csv(StringIO(markdown_str), sep="|", engine="python", skipinitialspace=True)
-    df = df.drop(columns=[""], errors="ignore")  # Drop empty columns if any
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # Drop unnamed columns
-    
-    # Drop the separator row (row that contains only dashes)
-    df = df.drop(index=0).reset_index(drop=True)
-    df.columns = df.columns.str.strip()  # Limpia espacios
-
-    return df

@@ -3,11 +3,12 @@ import dash_bootstrap_components as dbc
 
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils import model_information
+from Dashboard.utils.utils_data_drift import get_metrics_score_options
 
 def data_drift_layout():
         experiments_id = influxdb_handler.get_experiment_ids_from_bucket()
         model_name_options = model_information.get_model_name_options()
-        metrics_score_options = model_information.get_metrics_score_options()
+        metrics_score_options = get_metrics_score_options()
     
         return html.Div([
             html.H3("Data drift detectors", className="text-center"),
