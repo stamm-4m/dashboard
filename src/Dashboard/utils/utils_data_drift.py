@@ -58,13 +58,14 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
     try:
         # PSI (Population Stability Index)
         if score == "PSI":
-            bins = params.get('bins') or 10
+            bins = int(params.get('bins') or 10)
             epsilon = float(params.get('epsilon', 1e-8))
+            threshold = float(params.get('threshold') or 0.05)
             logging.info("Calculating PSI (Population Stability Index)...")
-            psi = PSI()
+            psi = PSI(threshold=threshold)
             result = psi.calculate(data_training, data_test,bins,epsilon)
-            logging.info(f"PSI score: {result.drift_score:.4f}")
-            return f"{result.drift_score:.4f}"
+            logging.info(f"PSI result: {result}")
+            return result
 
         # ADWIN (ADaptive WINdowing)
         elif score == "ADWIN":

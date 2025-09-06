@@ -5,11 +5,13 @@ import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.utils.utils_global import disabled_figure
 from Dashboard.utils.utils_sofsensors_offline import reload_models, generate_predictions, generate_prediction_name # the necessary utils functions for the callbacks are loaded
 from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
-
+from datetime import datetime
+import json
 
 # Control start prediction
 inicio_pred = 0
@@ -26,98 +28,72 @@ def update_experiment_display(data):
             if not data or "selected_experiment" not in data:
                 return "No Experiment Selected"
             return f"Selected Experiment ID: {data['selected_experiment']}"
-      
+
+
 @dash.callback(
-            Output("line-chart-prediction-off", "figure", allow_duplicate=True),  
-            Input({"type": "remove-btn", "index": ALL}, "n_clicks"),
-            State("selected-variables-off", "data"),
-            State("line-chart-prediction-off", "figure"),
-            prevent_initial_call=True
-        )
-def remove_graph_var(n_clicks, selected_variables, current_figure):
-            """
-            Removes only the trace of the corresponding variable when its delete button is pressed.
-            """
-            if not any(n_clicks):  # If no button has been pressed, do nothing
-                raise PreventUpdate  
-
-            if not current_figure or "data" not in current_figure:
-                raise PreventUpdate  # Prevent errors if the figure is empty
-
-            fig = go.Figure(current_figure)  # Keep the original figure
-
-            # Identify which buttons were pressed
-            clicked_indices = [i for i, click in enumerate(n_clicks) if click]
-
-            if not clicked_indices or not selected_variables:
-                raise PreventUpdate  
-
-            # Variables to remove
-            variables_to_remove = set(
-                selected_variables[i]["variable_name"]
-                for i in clicked_indices
-                if i < len(selected_variables) and "variable_name" in selected_variables[i]
-            )
-
-            print(f"❌ Removing variables from the graph: {variables_to_remove}")
-
-            # Filter traces and remove only the necessary ones
-            #fig.data = tuple(trace for trace in fig.data if trace.name not in variables_to_remove)
-            new_traces = [trace for trace in fig.data if trace.name not in variables_to_remove]
-            # Crear una nueva figura con los datos filtrados
-            new_fig = go.Figure(data=new_traces, layout=fig.layout)
-
-            print(f"📉 Updated graph. Remaining variables: {[trace.name for trace in new_fig.data]}")
-            return new_fig
-
-            
-@dash.callback(
-            Output("selected-variables-off", "data", allow_duplicate=True),
-            Output("variable-table-off", "children"),
-            Input("add-variable-btn", "n_clicks"),
-            Input({"type": "remove-btn", "index": ALL}, "n_clicks"),
-            [State('name-selector-off', 'value'),
-            State("selected-variables-off", "data")],
-            prevent_initial_call=True
-        )
+    Output("selected-variables-off", "data", allow_duplicate=True),
+    Output("variable-table-off", "children"),
+    Input("add-variable-btn", "n_clicks"),
+    Input({"type": "remove-btn", "var": ALL}, "n_clicks"),  # ✅ usamos 'var'
+    [State('name-selector-off', 'value'),
+     State("selected-variables-off", "data")],
+    prevent_initial_call=True
+)
 def update_table(add_click, remove_clicks, selected_variable, current_data):
-            if current_data is None:
-                current_data = []
+    """
+    Update the list of selected variables and refresh the table when a variable is added or removed.
 
-            # Check if Add button is clicked
-            if ctx.triggered_id == "add-variable-btn" and add_click:
-                #Validate that the variable is not already in the list
-                if selected_variable and selected_variable not in [v["variable_name"] for v in current_data]:
-                    current_data.append({"variable_name": selected_variable})
+    Args:
+        add_click (int): Click count for Add button.
+        remove_clicks (list): Click counts for Remove buttons.
+        selected_variable (str): Variable selected from dropdown.
+        current_data (list): Current list of variables.
 
-            # Check if Remove button is clicked
-            elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id["type"] == "remove-btn":
-                index_to_remove = ctx.triggered_id["index"]
-                if 0 <= index_to_remove < len(current_data):
-                    current_data.pop(index_to_remove)
+    Returns:
+        tuple: (updated variable list, HTML table)
+    """
+    if current_data is None:
+        current_data = []
 
-            # Generate the table rows dynamically
-            rows = [
-                html.Tr([
-                    html.Td(variable["variable_name"], className="text-center"),
-                    html.Td(
-                        dbc.Button(
-                            "Remove",
-                            id={"type": "remove-btn", "index": int(i)},
-                            color="danger",
-                            size="sm",
-                            className="remove-btn text-center"
-                        )
-                    )
-                ]) for i, variable in enumerate(current_data)
-            ]
-            # Add table header
-            table_header = html.Tr([html.Th("Variable monitoring", className="text-center"), html.Th("Action", className="text-center")])
-            table_body = [table_header] + rows
+    triggered_id = ctx.triggered_id  # Identify which input triggered the callback
 
-            # Wrap table with compact class
-            table = dbc.Table(table_body, bordered=True, hover=True, striped=True, className="table-sm text-center")
-            return current_data, table
+    # ✅ Add new variable
+    if triggered_id == "add-variable-btn" and add_click:
+        if selected_variable and selected_variable not in [v["variable_name"] for v in current_data]:
+            current_data = current_data + [{"variable_name": selected_variable}]  # force new list reference
+
+    # ✅ Remove variable
+    elif isinstance(triggered_id, dict) and triggered_id.get("type") == "remove-btn":
+        var_to_remove = triggered_id.get("var")
+        if var_to_remove:
+            current_data = [v for v in current_data if v["variable_name"] != var_to_remove]
+
+    # ✅ Build the updated table
+    rows = [
+        html.Tr([
+            html.Td(variable["variable_name"], className="text-center"),
+            html.Td(
+                dbc.Button(
+                    "Remove",
+                    id={"type": "remove-btn", "var": variable["variable_name"]},  # ✅ 'var'
+                    color="danger",
+                    size="sm",
+                    className="remove-btn text-center"
+                )
+            )
+        ]) for variable in current_data
+    ]
+
+    table_header = html.Tr([
+        html.Th("Variable Monitoring", className="text-center"),
+        html.Th("Action", className="text-center")
+    ])
+
+    table = dbc.Table([table_header] + rows, bordered=True, hover=True, striped=True, className="table-sm text-center")
+
+    print("✅ Updated current_data:", current_data)
+    return current_data, table
+
 
 
 @dash.callback(
@@ -186,117 +162,146 @@ def display_model_details(selected_model):
 
 # Callback to initialize the prediction
 @dash.callback(
-            Output("line-chart-prediction-off", "figure"),  # Graph where new variables will be added
-            Input("add-variable-btn", "n_clicks"),  # Button to add variables
-            Input("selected-variables-off", "data"),  # Variables selected by the user
-            State("line-chart-prediction-off", "figure"),  # Current state of the graph
-            prevent_initial_call=True  # Prevents automatic execution
-        )
-def update_graph_var(n_clicks, selected_variables, current_figure):
-            global dfc
+    Output("line-chart-prediction-off", "figure"),
+    Input("add-variable-btn", "n_clicks"),
+    Input("selected-variables-off", "data"),
+    State("line-chart-prediction-off", "figure"),
+    prevent_initial_call=True
+)
+def sync_figure_with_store(n_clicks, selected_variables, current_figure):
+    """
+    Sync the graph with the selected-variables store:
+     - Remove traces that are not in selected_variables (except prediction traces we keep).
+     - Add traces for variables that are in selected_variables but missing in the figure.
+    This keeps a single source of truth (the store) and avoids race conditions.
+    """
+    global dfc
 
-            print(f"🔄 Callback executed - Clicks: {n_clicks}, Selected variables: {selected_variables}")
+    # Start from existing figure (or a new one)
+    fig = go.Figure(current_figure) if current_figure else go.Figure()
 
-            if not selected_variables:
-                print("⚠ No variables selected. The graph will not be updated.")
-                return go.Figure(current_figure) if current_figure else go.Figure()
+    # Normalize helper
+    def _norm(x):
+        return str(x).strip().lower()
 
-            if dfc is None or "_time" not in dfc:
-                print("⚠ No data in dfc or missing '_time' column.")
-                return go.Figure(current_figure) if current_figure else go.Figure()
+    # Build desired variables set from the store (source of truth)
+    desired_vars = set()
+    if selected_variables:
+        desired_vars = {sv.get("variable_name") for sv in selected_variables if isinstance(sv, dict) and "variable_name" in sv}
 
-            df = pd.DataFrame(dfc)
-            df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
+    # Keep certain traces even if not in desired_vars (e.g. prediction traces)
+    # Adjust this set if you have other "static" trace names you must preserve
+    KEEP_TRACES = {"Penicillin Concentration"}
 
-            fig = go.Figure(current_figure) if current_figure else go.Figure()
+    # Current trace names (string normalized)
+    current_traces = [(trace, str(trace.name)) for trace in fig.data]
 
-            existing_traces = {trace.name for trace in fig.data}
-            print(f"📊 Already plotted variables: {existing_traces}")
+    # 1) Remove traces that are not desired and not in KEEP_TRACES
+    new_traces = [trace for trace, name in current_traces if (name in desired_vars) or (name in KEEP_TRACES)]
 
-            colors = px.colors.qualitative.Dark24  
+    # If something was removed, rebuild the figure to ensure a fresh object
+    if len(new_traces) != len(fig.data):
+        fig = go.Figure(data=new_traces, layout=fig.layout)
 
-            # Identify existing Y axes in the layout
-            existing_y_axes = {k for k in fig.layout if k.startswith("yaxis")}
-            num_existing_y_axes = len(existing_y_axes)
+    # Recompute existing trace names after possible removal
+    existing_trace_names = {str(t.name) for t in fig.data if t.name is not None}
 
-            # Iterate over each selected variable and add it if not already plotted
-            for i, var_data in enumerate(selected_variables):
-                if not isinstance(var_data, dict) or "variable_name" not in var_data:
-                    print(f"⚠ Unexpected format in selected_variables[{i}]: {var_data}")
-                    continue
+    # 2) Add missing traces for desired_vars that are not yet plotted
+    # Validate we have the dfc data
+    if dfc is None or "_time" not in dfc:
+        # No data available — just return the figure after removals
+        print("⚠ No dfc or missing '_time' — only removals applied (if any).")
+        # Force re-render
+        fig.update_layout(uirevision=str(datetime.utcnow().timestamp()))
+        fig.layout["meta"] = {"last_update": datetime.utcnow().isoformat()}
+        return fig
 
-                var = var_data["variable_name"]
+    df = pd.DataFrame(dfc)
+    df["_time"] = pd.to_datetime(df["_time"], errors="coerce")
 
-                if var in df.columns and var not in existing_traces:
-                    color = colors[num_existing_y_axes % len(colors)]  
-                    y_axis_name = f"yaxis{num_existing_y_axes + 1}"  # yaxis2, yaxis3, etc.
-                    y_axis_ref = f"y{num_existing_y_axes + 1}"  # y2, y3, etc.
+    # Utility: determine current maximum y-axis index used in traces (1 = y)
+    def _trace_axis_index(trace):
+        # trace.yaxis can be 'y' or 'y2', etc. If missing, default to 1
+        axis = getattr(trace, "yaxis", None)
+        if not axis:
+            return 1
+        axis = str(axis)
+        if axis == "y":
+            return 1
+        try:
+            return int(axis.lstrip("y"))
+        except:
+            return 1
 
-                    # Add trace with its own Y axis
-                    fig.add_trace(go.Scatter(
-                        x=df["_time"].astype(str),
-                        y=df[var],
-                        mode="lines",
-                        name=var,
-                        yaxis=y_axis_ref,  
-                        line=dict(color=color)
-                        
-                    ))
+    existing_axis_indexes = [_trace_axis_index(t) for t in fig.data] if fig.data else [1]
+    max_axis_index = max(existing_axis_indexes) if existing_axis_indexes else 1
 
-                    # Add new Y axis to the layout
-                    fig.update_layout(**{
-                        y_axis_name: dict(
-                            title=dict(text=var, font=dict(color=color)),  
-                            tickfont=dict(color=color),
-                            anchor="x",
-                            overlaying="y",  
-                            side= 'right',
-                            position =  1 - (0.10 * (num_existing_y_axes+1 - 2)),
-                            showgrid=False
-                        )
-                    })
+    colors = px.colors.qualitative.Dark24
 
-                    num_existing_y_axes += 1
+    for var in desired_vars:
+        if var in existing_trace_names:
+            # already plotted
+            continue
+        if var not in df.columns:
+            print(f"⚠ Variable '{var}' not found in dfc columns; skipping.")
+            continue
 
-                    print(f"✅ Variable '{var}' added with axis {y_axis_ref}.")
+        # new axis index
+        new_axis_index = max_axis_index + 1
+        yaxis_name = f"yaxis{new_axis_index}"   # e.g. 'yaxis2'
+        yaxis_ref = f"y{new_axis_index}"        # e.g. 'y2'
 
-                else:
-                    print(f"⚠ Variable '{var}' is already plotted or does not exist in the data.")
+        color = colors[(new_axis_index - 1) % len(colors)]
 
-            # Configure general graph layout
-            fig.update_layout(
-                xaxis=dict(
-                    title="Time",
-                    tickangle=-45,
-                    type="date"
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="top",
-                    y=-0.2,
-                    xanchor="center",
-                    x=0.5
-                )
+        # add trace
+        fig.add_trace(go.Scatter(
+            x=df["_time"].astype(str),
+            y=df[var],
+            mode="lines",
+            name=var,
+            yaxis=yaxis_ref,
+            line=dict(color=color)
+        ))
+
+        # add axis layout
+        position = 1 - (0.10 * (new_axis_index - 2)) if new_axis_index >= 2 else 0  # keep similar logic you had
+        fig.update_layout(**{
+            yaxis_name: dict(
+                title=dict(text=var, font=dict(color=color)),
+                tickfont=dict(color=color),
+                anchor="x",
+                overlaying="y",
+                side="right",
+                position=position,
+                showgrid=False
             )
+        })
 
-            fig.update_layout(
-                xaxis=dict(
-                    rangeselector=dict(
-                        buttons=[
-                            dict(count=6, label="6 hours", step="hour", stepmode="backward"),
-                            dict(count=1, label="1 day", step="hour", stepmode="backward"),
-                            dict(count=1, label="1 month", step="month", stepmode="backward"),
-                            dict(step="all")
-                        ]
-                    ),
-                  
-                    type="date"
-                )
-            )       
+        max_axis_index = new_axis_index
+        existing_trace_names.add(var)
+        print(f"✅ Added trace for variable '{var}' on axis {yaxis_ref}.")
 
-            print(f"📊 Graph updated with {len(fig.data)} variables and multiple Y axes.")
+    # 3) Final layout polish and force re-render
+    fig.update_layout(
+        xaxis=dict(title="Time", tickangle=-45, type="date"),
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+    )
+    # range selector (preserve your previous config)
+    fig.update_layout(xaxis=dict(rangeselector=dict(
+        buttons=[
+            dict(count=6, label="6 hours", step="hour", stepmode="backward"),
+            dict(count=1, label="1 day", step="day", stepmode="backward"),
+            dict(count=1, label="1 month", step="month", stepmode="backward"),
+            dict(step="all")
+        ]),
+        type="date"
+    ))
 
-            return fig
+    fig.update_layout(uirevision=str(datetime.utcnow().timestamp()))
+    fig.layout["meta"] = {"last_update": datetime.utcnow().isoformat()}
+
+    print(f"📊 Sync finished. Traces now: {[t.name for t in fig.data]}")
+    return fig
         
 @dash.callback(
             Output('line-chart-prediction-off', 'figure',allow_duplicate=True),
@@ -312,7 +317,7 @@ def update_graph(data_model, store_data, n, data_prediction, selected_variables)
             global inicio_pred, dfc
             
             if store_data is None or 'selected_experiment' not in store_data:
-                return ({'data': [], 'layout': {}}, None)  
+                return (disabled_figure, None)  
             # Get the data for the selected batch
             dfc = influxdb_handler.get_data_by_batch_id2(store_data['selected_experiment'])
             inicio_pred += 1  # Reset the prediction counter

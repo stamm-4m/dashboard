@@ -144,6 +144,13 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
         return dash.no_update  # Prevent update if values are missing
 
     band_univariable = metric_score.strip() in UNIVARIABLE_METRICS
+    print(band_univariable)
+    print(selected_input)
+    logging.warning(" values: band_univariable {band_univariable},  selected_input {selected_input}")
+
+    if band_univariable and not selected_input:
+        logging.warning(" No update: band_univariable and selected_input")
+        return dash.no_update
 
     # 1. Retrieve data from the selected model's YAML
     config = model_information.get_configuration_by_model_name(soft_sensor)  # Implement this function

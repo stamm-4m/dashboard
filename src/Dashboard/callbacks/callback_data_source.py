@@ -95,7 +95,6 @@ def update_table_data(experiment_id):
             processed_data.append(row)
         
         title = html.H5(f"Statistical summary of the variables from the chosen experiment: {experiment_id}")
-
         return processed_data, title
 
     except Exception as e:

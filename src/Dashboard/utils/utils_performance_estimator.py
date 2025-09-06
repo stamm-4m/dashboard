@@ -36,29 +36,72 @@ def reload_models():
     model_information.configurations = []
     model_information.load_all_models()
 
-# Point-by-point metric functions
 def calculate_mae(y_true, y_pred):
-    return abs(y_true - y_pred)  # Point-by-point MAE
+    """
+    Compute Mean Absolute Error (MAE) as a single value.
+    
+    Formula:
+        MAE = mean(|y_true - y_pred|)
+    """
+    return float(np.mean(np.abs(y_true - y_pred)))
+
 
 def calculate_mse(y_true, y_pred):
-    return (y_true - y_pred) ** 2  # Point-by-point MSE
+    """
+    Compute Mean Squared Error (MSE) as a single value.
+    
+    Formula:
+        MSE = mean((y_true - y_pred)^2)
+    """
+    return float(np.mean((y_true - y_pred) ** 2))
+
 
 def calculate_rmse(y_true, y_pred):
-    return np.sqrt((y_true - y_pred) ** 2)  # Point-by-point RMSE
+    """
+    Compute Root Mean Squared Error (RMSE) as a single value.
+    
+    Formula:
+        RMSE = sqrt(mean((y_true - y_pred)^2))
+    """
+    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
 def calculate_vpd(y_true, y_pred):
-    return np.abs((y_pred - y_true) / y_true)  # Point-by-point VPD
+    """Compute point-by-point Variation Percentage Difference."""
+    return np.abs((y_pred - y_true) / y_true) * 100  # Expressed as percentage
 
 # Metric functions that return a single value
 def calculate_pcc(y_true, y_pred):
-    return np.corrcoef(y_true, y_pred)[0, 1]  # Single value
+    """Compute Pearson Correlation Coefficient between two arrays."""
+    return np.corrcoef(y_true, y_pred)[0, 1]
 
 def calculate_cossim(y_true, y_pred):
-    return np.dot(y_true, y_pred) / (np.linalg.norm(y_true) * np.linalg.norm(y_pred))  # Single value
+    """Compute Cosine Similarity between two arrays."""
+    return np.dot(y_true, y_pred) / (np.linalg.norm(y_true) * np.linalg.norm(y_pred))
 
 def calculate_cv(y_true, y_pred):
-    errors = y_pred - y_true
-    return np.std(errors) / np.mean(np.abs(y_true))  # Single value
+    """
+    Compute Coefficient of Variation (CV) as:
+    
+    CV = std(prediction difference) / mean(prediction difference)
+    
+    Where:
+        difference = (y_pred - y_true)
+
+    Args:
+        y_true (array-like): First set of predictions (or true values).
+        y_pred (array-like): Second set of predictions.
+        n (int): number elements
+
+    Returns:
+        float: CV (unitless).
+    """
+    differences = y_pred - y_true
+    mean_diff = np.mean(differences)
+    if mean_diff == 0:
+        return np.nan  # Avoid division by zero
+    return np.abs(np.std(differences)) / mean_diff
+
+
 
 def compute_metric(acronym: str, y_true: np.ndarray, y_pred: np.ndarray) -> Union[np.ndarray, float]:
     """
@@ -78,6 +121,7 @@ def compute_metric(acronym: str, y_true: np.ndarray, y_pred: np.ndarray) -> Unio
                        - "CV"  : Coefficient of Variation (single value)
         y_true (np.ndarray): Array of true values.
         y_pred (np.ndarray): Array of predicted values.
+        n (int): Int elements number
 
     Returns:
         Union[np.ndarray, float]: The computed metric. It can be:
@@ -95,7 +139,7 @@ def compute_metric(acronym: str, y_true: np.ndarray, y_pred: np.ndarray) -> Unio
         >>> compute_metric("PCC", y_true, y_pred)
         0.9819805060619657
     """
-    metric_map: dict[str, Callable[[np.ndarray, np.ndarray], Union[np.ndarray, float]]] = {
+    metric_map: dict[str, Callable[[np.ndarray, np.ndarray], Union[np.ndarray, float]], int] = {
         "MAE": calculate_mae,
         "MSE": calculate_mse,
         "RMSE": calculate_rmse,

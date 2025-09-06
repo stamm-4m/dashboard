@@ -12,7 +12,7 @@ def performance_estimator_layout():
         metrics_score_options = get_performance_estimators_options()
         # Initialize the figure with a default layout
         return html.Div([
-                html.H3("Performance estimator", className="text-center"),
+                html.H3("Model divergence", className="text-center"),
 
                 dbc.Card([
                     dbc.CardBody([
@@ -35,13 +35,18 @@ def performance_estimator_layout():
 
                             dbc.Col([
                                 html.Label("Monitoring soft sensor:"),
-                                dcc.Dropdown(
-                                    id='soft-sensor-input',
+                                dcc.Loading(
+                                        id="loading-models",
+                                        type="circle",
+                                        color="#0d6efd",  # Azul Bootstrap
+                                        fullscreen=False,
+                                        children=dcc.Dropdown(
+                                    id='soft-sensor-input-estimator',
                                     options=model_name_options,
                                     className='mb-2',
                                     placeholder="Select soft sensors",
                                     style={'width': '100%', 'whiteSpace': 'normal'}
-                                ),
+                                )),
                                 html.Label("Performance estimator:"),
                                 dcc.Dropdown(
                                     id='performance-estimator-dropdown',

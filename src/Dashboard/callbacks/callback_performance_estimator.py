@@ -15,8 +15,8 @@ from Dashboard.utils.utils_global import disabled_figure, generate_prediction_na
 
         # Function to update the options of the existing models
 @dash.callback(
-            Output('soft-sensor-input', 'options'),
-            Input('soft-sensor-input', 'n_clicks')
+            Output('soft-sensor-input-estimator', 'options'),
+            Input('soft-sensor-input-estimator', 'n_clicks')
         )
 def update_model_options(n_clicks):
     reload_models()
@@ -25,7 +25,7 @@ def update_model_options(n_clicks):
 @dash.callback(
             Output("performance-plot", "figure", allow_duplicate=True),
             Output("performance-estimator-container", "children",allow_duplicate=True),
-            Output("soft-sensor-input", "value"),
+            Output("soft-sensor-input-estimator", "value"),
             Output("performance-estimator-dropdown", "value"),  
             Input("reset-performance-button", "n_clicks"),
             prevent_initial_call=True
@@ -57,7 +57,7 @@ def update_experiment_display(data):
 #load input for each model selected
 @dash.callback(
             Output('input-model-dropdown', 'options',allow_duplicate=True),
-            Input('soft-sensor-input', 'value'),
+            Input('soft-sensor-input-estimator', 'value'),
             prevent_initial_call=True
 )
 def update_input_options(selected_model):
@@ -91,6 +91,11 @@ def update_estimator_section(selected_metric):
 
     new_estimator_section = dbc.Card([
         dbc.CardBody([
+            dbc.Row([
+                 dbc.Col([
+                    html.H6("Performance estimator", className="mb-3"),  
+                 ])
+            ], className="mb-3 shadow-sm"), 
             dbc.Row([
                 # Left column: Formula, parameters, and implementation notes
                 dbc.Col([
@@ -140,7 +145,7 @@ def update_estimator_section(selected_metric):
 @dash.callback(
             Output("performance-plot", "figure"),
             Input("add-performance-button", "n_clicks"),
-            State("soft-sensor-input", "value"),  
+            State("soft-sensor-input-estimator", "value"),  
             Input("store-selected-state", "data"),
             Input("model-data-store", "data"),
             Input("performance-estimator-dropdown", "value"),  
@@ -188,7 +193,7 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
                               fillcolor="red", opacity=0.2, layer="below", line_width=0)
 
             if low_threshold is not None:
-                fig.add_hrect(y0=-1, y1=low_threshold,  # From 0 to the low threshold
+                fig.add_hrect(y0=-10, y1=low_threshold,  # From 0 to the low threshold
                               fillcolor="green", opacity=0.2, layer="below", line_width=0)
 
             # Add intermediate area (moderate) in orange
@@ -241,39 +246,12 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
             #print("y_true", y_true.to_list())
             #print("y_pred", y_pred.to_list())
             print("Selected metric:", selected_metric)
-
-            # Dictionary of pointwise metrics
-            pointwise_metrics = {
-                "VPD",
-                "MAE",
-                "MSE",
-                "RMSE",
-            }
-
-            # Dictionary of global metrics (return a single value)
-            constant_metrics = {
-                "PCC",
-                "CosSim",
-                "CV"
-            }
             
-            value = compute_metric(selected_metric,y_true,y_pred)
-            print("resultado:",value)
-            mode="lines+markers"
-            if selected_metric in pointwise_metrics:
-                # Pointwise metrics → vector con un valor por cada punto
-                metric_values = value
-                mode = 'markers'  # o 'lines+markers' si quieres unir
-            elif selected_metric in constant_metrics:
-                # Constant metrics → un único valor repetido para todos los puntos
-                metric_values = [value] * len(y_true)
-                mode = 'lines'  # Línea horizontal
-            else:
-                print(f"❌ Metric '{selected_metric}' not supported.")
-                return fig
-
+            metric_value = compute_metric(selected_metric,y_true,y_pred)
+            print("resultado:",metric_value)
+            mode = 'markers'  # o 'lines+markers' si quieres unir
             
-            if metric_values is None or len(metric_values) == 0:
+            if metric_value is None or metric_value == 0:
                 print(f"⚠️ No metric values computed for {selected_metric}. Skipping plot.")
                 return fig
             #print(f"{metric.name} ({metric.acronym}): {value:.4f}")
@@ -285,12 +263,10 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
 
             # Add the new trace for the selected metric
             fig.add_trace(go.Scatter(
-                #x=list(range(1, len(metric_values) + 1)),  # Positions 1, 2, ..., n
-                x=metric_values.index.tolist(),
-                y=metric_values,
+                x=[n],  # Un solo valor X
+                y=[metric_value],  # Un solo valor Y
                 mode=mode,
                 name=f"{selected_metric} {name_prediction2}",
-                line=dict(color=color, dash="dot"),  # Dotted line
                 marker=dict(symbol="diamond", size=8, color=color)  # Diamond marker with assigned color
             ))
 
@@ -299,9 +275,9 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
                 xaxis=dict(title="Last elements"),
                 yaxis=dict(title=selected_metric),
                 yaxis_range=[
-                    min(0, float(np.min(metric_values))),  # Si hay negativos, muestra
-                    float(np.max(metric_values)) + 1
-                ] if selected_metric not in ["PCC", "CosSim"] else None,
+                    min(0,float(np.min(metric_value))-10),  # Si hay negativos, muestra
+                    float(np.max(metric_value)) + 10
+                ],
                 legend=dict(
                     orientation="h",
                     yanchor="top",
@@ -314,66 +290,70 @@ def update_performance_plot(n_clicks, model_selected, experiment_id, model_data_
     return fig
 
 @dash.callback(
-    Output("metrics-table", "data"),   # Actualiza la tabla con métricas punto a punto
-    Output("metrics-div", "children"), # Muestra métricas constantes
-    Input("soft-sensor-input", "value"),  # model_selected
-    State("store-selected-state", "data"),  # experiment_id
-    State("model-data-store", "data"),      # model_data_selected
-    State("metrics-table", "children"),     # Tabla anterior
+    Output("metrics-table", "data"),
+    Output("metrics-table", "columns"),
+    Input("add-performance-button", "n_clicks"),
+    Input("soft-sensor-input-estimator", "value"),
+    State("store-selected-state", "data"),
+    State("model-data-store", "data"),
+    State("metrics-table", "data"),
+    State({"type": "dynamic-input", "index": ALL}, "value"),
+    Input("performance-estimator-dropdown", "value"),
     prevent_initial_call=True
 )
-def update_metrics_table(model_selected, experiment_id, model_data_selected, existing_table):
+def update_metrics_table(click_n, model_selected, experiment_id, model_data_selected, existing_data, param_values, metric_selected):
     if not model_selected or not model_data_selected or not experiment_id:
-        logging.warning("no_update: not model_selected or not model_data_selected or not experiment_id")
-        return dash.no_update, ""
+        return dash.no_update, dash.no_update
 
-    # ✅ Obtener nombres de predicciones y datos del batch
+    # ✅ Obtener nombres de predicciones
     name_file_model = model_information.get_configuration_by_model_name(model_selected)['model_description']['config_files']['model_file']
     name_prediction1 = generate_prediction_name(model_data_selected["model_file"])
     name_prediction2 = generate_prediction_name(name_file_model)
 
     df_bach = influxdb_handler.get_data_by_batch_id2(experiment_id["selected_experiment"])
 
-    if name_prediction1 in df_bach.columns and name_prediction2 in df_bach.columns:
-        y_true = df_bach[name_prediction1]
-        y_pred = df_bach[name_prediction2]
+    if name_prediction1 in df_bach.columns and name_prediction2 in df_bach.columns and param_values:
+        n = param_values[0]
+        y_true = df_bach[name_prediction1].iloc[:n]
+        y_pred = df_bach[name_prediction2].iloc[:n]
 
         # ✅ Eliminar NaN
         df_valid = pd.DataFrame({"y_true": y_true, "y_pred": y_pred}).dropna()
         if df_valid.empty:
-            return [], html.Div("⚠️ All values contain NaN, unable to compute metrics.")
+            return dash.no_update, dash.no_update
 
         y_true = df_valid["y_true"]
         y_pred = df_valid["y_pred"]
 
-        # ✅ Reconstruir DataFrame si ya existía
-        if existing_table:
-            df = pd.DataFrame(existing_table)
+        # ✅ Calcular métrica seleccionada
+        result = compute_metric(metric_selected, y_true, y_pred)
+        result = round(result, 4)
+
+        # ✅ Reconstruir DataFrame pivotado
+        if existing_data and len(existing_data) > 0:
+            df_table = pd.DataFrame(existing_data)
+            df_table.set_index("Metric", inplace=True)
         else:
-            df = pd.DataFrame({name_prediction1: y_true, name_prediction2: y_pred})
+            # Crear estructura inicial si no existe
+            df_table = pd.DataFrame(columns=[model_selected])
+            df_table.index.name = "Metric"
 
-        # ✅ Métricas punto a punto (MAE, MSE, RMSE)
-        selected_metrics = ["MAE", "MSE", "RMSE"]
-        for metric in selected_metrics:
-            result = compute_metric(metric, y_true, y_pred)
-            if isinstance(result, (list, np.ndarray, pd.Series)):
-                result = np.round(result, 4)
-                print("resultado:",result)
-            elif isinstance(result, float):
-                result = round(result, 4)
-            df[metric] = result
+        # ✅ Asegurar que la fila (métrica) exista
+        if metric_selected not in df_table.index:
+            df_table.loc[metric_selected] = [None] * len(df_table.columns)
 
-        # ✅ Métricas constantes (PCC, CosSim, CV)
-        constant_metrics = ["PCC", "COSSIM", "CV"]
-        metrics_values = []
-        for metric in constant_metrics:
-            value = compute_metric(metric, y_true.to_numpy(), y_pred.to_numpy())
-            metrics_values.append(html.P(f"{metric}: {round(value, 4)}"))
+        # ✅ Asegurar que la columna (modelo) exista
+        if model_selected not in df_table.columns:
+            df_table[model_selected] = None
 
-        # ✅ Retornar datos para DataTable y HTML con métricas constantes
-        df_reset = df.reset_index().rename(columns={"index": "Point"})
-        return df_reset.to_dict("records"), html.Div(metrics_values)
-        #return df.to_dict("records"), html.Div(metrics_values)
+        # ✅ Asignar valor
+        df_table.loc[metric_selected, model_selected] = result
 
-    # Si no hay columnas válidas
-    return [], html.Div("⚠️ No valid predictions found.")
+        # ✅ Reset index para DataTable
+        df_table.reset_index(inplace=True)
+
+        columns = [{"name": col, "id": col} for col in df_table.columns]
+
+        return df_table.to_dict("records"), columns
+
+    return dash.no_update, dash.no_update

@@ -171,7 +171,7 @@ class InfluxDBServices:
             |> filter(fn: (r) => r["_measurement"] == "{str(batch_id)}")
             """
 
-            print("query", query)
+            #print("query", query)
 
             # Execute the query
             results = self.connector.query_api.query(query=query)
@@ -264,7 +264,7 @@ class InfluxDBServices:
 
 
 
-    def get_distinct_experiment_ids(self, time_range="-120d"):
+    def get_distinct_experiment_ids(self, time_range="0"):
         """
         Retrieves a unique list of experiment_ID from the specified bucket in InfluxDB.
 
@@ -303,7 +303,7 @@ class InfluxDBServices:
             print(f"Error retrieving experiment_ID from bucket '{INFLUXDB_BUCKET}': {e}")
             return []
 
-    def get_category_counts(self, experiment_ID, time_range="-90d"):
+    def get_category_counts(self, experiment_ID, time_range="0"):
         """
         Retrieves the count of sensors, actuators, soft sensors, and computed variables
         for a specific experiment_ID.
@@ -344,7 +344,7 @@ class InfluxDBServices:
             logging.error(f"Error retrieving category counts: {e}")
             return {"sensor": 8, "actuator": 11, "computed_variable": 2, "soft_sensor": 1, "offline_measurement": 5}
 
-    def get_experiment_duration(self, experiment_ID, time_range="-100d"):
+    def get_experiment_duration(self, experiment_ID, time_range="0"):
         """
         Fetch the duration of an experiment based on its ID.
 
@@ -375,7 +375,7 @@ class InfluxDBServices:
             |> sort(columns: ["_time"], desc: true)
             |> limit(n: 1)
             """
-            print(query_max_time)
+            #print(query_max_time)
             # Execute
             result_min_time = self.connector.query_api.query(org=self.connector.org, query=query_min_time)
             result_max_time = self.connector.query_api.query(org=self.connector.org, query=query_max_time)
@@ -406,7 +406,7 @@ class InfluxDBServices:
             print(f"[ERROR] get_experiment_duration: {e}")
             return 0.0
 
-    def get_data_for_table(self, experiment_ID, time_range="-100d"):
+    def get_data_for_table(self, experiment_ID, time_range="0"):
         """
         Fetch the data required for populating the DataTable, adding units based on the variable mapping.
         Numeric values are rounded to 4 decimals when applicable.
@@ -615,7 +615,7 @@ class InfluxDBServices:
                 print("✅ Writing point:", point.to_line_protocol())
                 write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)
     
-    def get_count_data_experiment_ids(self, time_range="-90d"):
+    def get_count_data_experiment_ids(self, time_range="0"):
         """
         Retrieves a DataFrame with experiment_IDs and their count from the specified bucket in InfluxDB.
 

@@ -234,7 +234,7 @@ class ModelInformation:
                     # Navigate through the configuration structure to find the model
                     model_config = config.get('model_description', {})
                     if model_config.get('model_name') == model_name:
-                        print("config: ",config)
+                        #print("config: ",config)
                         return self.get_feature_categories(config)
                 else:
                     print("Model not found in configuration")

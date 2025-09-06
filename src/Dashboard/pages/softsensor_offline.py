@@ -15,58 +15,56 @@ def sofsensor_offline_layout():
             # Card container
             dbc.Card(
                 dbc.CardBody([
-                    # Additional form for file information
                     dbc.Container([
-                        # General model information section
                         dbc.Row([
-                            # Column for model description (centered text)
+                            # Columna para el Label y Dropdown con Loading
                             dbc.Col(
                                 [
-                                    dbc.Label("Model Name:"),
-                                    dcc.Dropdown(
-                                        id='model-selector-off',
-                                        options=model_name_options,
-                                        placeholder="Select a model",
-                                        style={
-                                            'width': '100%',
-                                            'marginBottom': '20px',
-                                            'height': '38px',  # Ensure consistent height with button
-                                            'lineHeight': '1.5',  # Adjust internal text alignment
-                                        }
+                                    dbc.Label("Model Name:", className="mb-2"),
+                                    dcc.Loading(
+                                        id="loading-models",
+                                        type="circle",
+                                        color="#0d6efd",  # Azul Bootstrap
+                                        fullscreen=False,
+                                        children=dcc.Dropdown(
+                                            id='model-selector-off',
+                                            options=model_name_options,
+                                            placeholder="Select a model",
+                                            className="shadow-sm",
+                                            style={
+                                                'width': '100%',
+                                                'minWidth': '280px',  # Ancho mínimo elegante
+                                                'height': '42px',     # Ajusta altura
+                                                
+                                            }
+                                        )
                                     )
                                 ],
-                                md=7,  # Each column takes up 1/4 of the row
-                                className="d-flex flex-column align-items-center"
+                                md=7,
+                                className="d-flex flex-column"
                             ),
-                            # Column for action button
+                            # Columna para el botón
                             dbc.Col(
                                 [
                                     dbc.Button(
-                                        "Show simulation",
+                                        "Show Simulation",
                                         id="run",
                                         n_clicks=0,
                                         color="primary",
-                                        style={
-                                            'width': '60%',
-                                        },
+                                        size="lg",  # Botón grande
+                                        className="shadow-sm w-100",  # Igual ancho que dropdown
                                     )
                                 ],
-                                md=5,  # Each column takes up 1/4 of the row
-                                className="d-flex justify-content-center mt-2",  # Center vertically
+                                md=5,
+                                className="d-flex align-items-end"
                             ),
-                        ],
-                        className="align-items-center"),
-                        # Row for model details
-                        dbc.Row(
-                            dbc.Col(
-                                html.Div(id='model-details-off'),
-                                width=12
-                            )
-                        ),
-                    ],
-                    fluid=True),
+                        ], className="g-3"),  # Espacio entre columnas
+                        dbc.Row([
+                            dbc.Col(html.Div(id='model-details-off',className="mt-5"), width=12)
+                        ]),
+                    ], fluid=True),
                 ]),
-                className="my-3 shadow-sm",
+                className="my-3 shadow-sm rounded-4 p-3"
             ),
             dbc.Card(
                 dbc.CardBody([
