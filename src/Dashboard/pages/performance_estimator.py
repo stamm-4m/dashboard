@@ -118,7 +118,7 @@ def performance_estimator_layout():
                                         title="Show Detailed Metrics"
                                     ),
                                 ],
-                                start_collapsed=True  # Accordion starts closed
+                                start_collapsed=False  # Accordion starts closed
                             )
                         ], width=12),
                 ], className="mb-4"),

@@ -77,7 +77,7 @@ def sidebar(session_data = None):
                 dbc.Collapse(
                     [
                         dbc.NavLink("Data Drift Detectors", href="/monitoring/data-drift", className="sidebar-link ms-4", id="data-drift-link"),
-                        dbc.NavLink("Performance Estimators", href="/monitoring/performance", className="sidebar-link ms-4", id="performance-link"),
+                        dbc.NavLink("Model divergence", href="/monitoring/performance", className="sidebar-link ms-4", id="performance-link"),
                     ], 
                     id="monitoring-collapse", 
                     is_open=False),

@@ -105,16 +105,16 @@ performance_estimators:
     type: "model_disagreement"
     description: "The Coefficient of Variation (CV) is the ratio of the standard deviation to the mean of prediction differences. It is a normalized measure of the variability in prediction differences."
     method:
-      formula: "CV = (σ(Prediction_1 - Prediction_2)) / mean(Prediction_1 - Prediction_2)"
+      formula: "CV = (n(Prediction_1 - Prediction_2)) / mean(Prediction_1 - Prediction_2)"
       thresholds:
         low: "< 0.1: Low variation, models are stable"
         moderate: "0.1 <= CV < 0.25: Moderate variation"
         high: ">= 0.25: High variation, models showing substantial instability"
     configuration:
       method_parameters:
-        - name: "σ"
-          description: "The standard deviation of the prediction differences."
-          default: "Calculated from the differences"
+        - name: "n"
+          description: "The number of data points used to calculate the error."
+          default: "Length of the input data"
     implementation_notes:
       - "CV normalizes the prediction variance by the mean, making it useful when comparing models across different scales."
       - "A high CV suggests that one model might be less stable or more sensitive to input variations than another."

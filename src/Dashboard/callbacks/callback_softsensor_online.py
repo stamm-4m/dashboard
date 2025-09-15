@@ -167,7 +167,7 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,n
                 # Generate penicillin predictions    
                 name_prediction = generate_prediction_name(data_model["model_file"])
                 predicted_values = generate_predictions(store_data['selected_experiment'], inicio_pred)
-
+                print("predicted_values: ",predicted_values)
                 if predicted_values is None:
                     print(f"⚠️ Not data out index inicio_pred:  {inicio_pred}.")
                     inicio_pred += 1
