@@ -11,6 +11,7 @@ def performance_estimator_layout():
         model_name_options = model_information.get_model_name_options()
         metrics_score_options = get_performance_estimators_options()
         # Initialize the figure with a default layout
+        # Normalizar model_name_options a lista de dict
         return html.Div([
                 html.H3("Model divergence", className="text-center"),
 
@@ -43,27 +44,35 @@ def performance_estimator_layout():
                                         children=dcc.Dropdown(
                                     id='soft-sensor-input-estimator',
                                     options=model_name_options,
+                                    multi=True,
                                     className='mb-2',
                                     placeholder="Select soft sensors",
                                     style={'width': '100%', 'whiteSpace': 'normal'}
                                 )),
-                                html.Label("Performance estimator:"),
-                                dcc.Dropdown(
-                                    id='performance-estimator-dropdown',
-                                    options=metrics_score_options,
-                                    className='mb-2',
-                                    searchable=True,
-                                    placeholder="Select performance estimator",
-                                    style={'width': '100%'}
+                                # Time range
+                                dbc.Label("Time range selection:"),
+                                dcc.RangeSlider(
+                                    id="time-window-size",
+                                    min=0,
+                                    max=0,
+                                    step=1,
+                                    marks=None,
+                                    value=[0, 100],
+                                    tooltip={
+                                        "placement": "bottom",
+                                        "always_visible": True,
+                                        "style": {"color": "LightSteelBlue", "fontSize": "20px"},
+                                    }
                                 ),
+                                html.Div(id="time-ws-slider-labels", style={"textAlign": "center", "marginBottom": "20px"}),
+                                
                             ], width=6),                      
 
                         ])
                     ])
                 ], className="mb-3 shadow-sm"),
 
-                html.Div(id="performance-estimator-container"),  # Container where selected metrics will be added
-
+                
                 # Metric result display
                 dbc.Row([
                     dbc.Col([
@@ -106,6 +115,15 @@ def performance_estimator_layout():
                                     dbc.AccordionItem(
                                         [
                                             html.H5("Detailed Prediction and Metrics Table", className="mb-3"),
+                                            html.Label("Performance estimator:"),
+                                            dcc.Dropdown(
+                                                id='performance-estimator-dropdown',
+                                                options=metrics_score_options,
+                                                className='mb-2',
+                                                searchable=True,
+                                                placeholder="Select performance estimator",
+                                                style={'width': '100%'}
+                                            ),
                                             html.Div(id='metrics-div'),
                                             dash_table.DataTable(
                                                 id='metrics-table',
@@ -122,5 +140,6 @@ def performance_estimator_layout():
                             )
                         ], width=12),
                 ], className="mb-4"),
+                html.Div(id="performance-estimator-container"),  # Container where selected metrics will be added
 
             ], className="container")

@@ -213,7 +213,7 @@ def update_timeseries_data_count(interval_value, interval_unit,selected_field):
     """
     Updates the time series chart showing valid data point counts per interval.
     """
-    print(selected_field)
+    print("selected_field: ", selected_field)
     try:
         if not interval_value or not interval_unit or not selected_field:
             return go.Figure()
@@ -237,6 +237,8 @@ def update_timeseries_data_count(interval_value, interval_unit,selected_field):
         }
         
         interval_str = f"{interval_value}{unit_map[interval_unit]}"
+
+        print("interval_str: ",interval_str)
 
         for exp_id in df["_measurement"].unique():
             df_exp = df[df["_measurement"] == exp_id].copy()
@@ -266,13 +268,26 @@ def update_timeseries_data_count(interval_value, interval_unit,selected_field):
 
         final_df = pd.concat(results, ignore_index=True)
 
-        fig = px.line(
+        fig = px.histogram(
             final_df,
             x="_time",
             y="Data Count",
             color="Experiment ID",
-            title=f"Data Count Every {interval_value} {interval_unit} ({selected_field})"
+            title=f"Data Count Every {interval_value} {interval_unit} ({selected_field})",
+            
         )
+
+        unit_to_ms = {
+            "seconds": 1000,
+            "minutes": 60 * 1000,
+            "hours": 3600 * 1000,
+            "days": 24 * 3600 * 1000,
+            "months": 30 * 24 * 3600 * 1000,
+        }
+
+        bin_size = interval_value * unit_to_ms.get(interval_unit, 60 * 1000)  # default 1 min
+
+        fig.update_traces(xbins=dict(size=bin_size))
 
         fig.update_layout(margin={"l": 20, "r": 20, "t": 50, "b": 20})
 

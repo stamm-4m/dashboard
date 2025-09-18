@@ -292,6 +292,7 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,n
                             xanchor="center",
                             x=0.5
                         ),
+                        hovermode="x unified",
                         **layout_update
                     )
                     

@@ -391,7 +391,8 @@ def update_graph(data_model, store_data, n, data_prediction, selected_variables)
                             title=txt_prediction,
                             title_font=dict(color="blue"),
                             tickfont=dict(color="blue"),
-                            side="left"
+                            side="left",
+                            hoverformat=".2f"
                         ),
                         legend=dict(
                             orientation="h",
@@ -399,7 +400,8 @@ def update_graph(data_model, store_data, n, data_prediction, selected_variables)
                             y=-0.2,
                             xanchor="center",
                             x=0.5
-                        )
+                        ),
+                        hovermode="x unified"
                     )
 
                     fig.update_layout(

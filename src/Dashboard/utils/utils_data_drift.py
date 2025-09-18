@@ -165,6 +165,7 @@ def get_detector_description(detector_selected):
         # Handle ADWIN (ADaptive WINdowing)
         elif detector_selected == "ADWIN":
             adwin = Adwin()
+            print("default values: ",adwin._delta)
             md_drift_detector = adwin.metadata
             
         # Handle Kolmogorov-Smirnov detector
