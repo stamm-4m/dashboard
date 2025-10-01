@@ -149,13 +149,15 @@ class InfluxDBServices:
             print(f"Error retrieving experiment_ID: {e}")
             return []
   
-    def get_data_by_batch_id2(self, batch_id, start = "0"):
+    def get_data_by_batch_id2(self, batch_id, minutes: int = 0):
         """
         Returns a DataFrame with all fields and values associated with a given batch_id.
 
         Args:
             batch_id (int/str): The batch identifier.
-
+            minutes (int, optional): 
+            - 0 -> fetch all data
+            - n > 0 -> fetch data from the last n minutes
         Returns:
             pd.DataFrame: DataFrame with the data corresponding to the batch_id.
         """
@@ -163,11 +165,16 @@ class InfluxDBServices:
             # Validate batch_id
             if not batch_id:
                 raise ValueError("The batch_id cannot be None or empty.")
-
+            
+            # Build time range part
+            if minutes == 0 or minutes == 5:
+                start_flux = "-inf"
+            else:
+                start_flux = f"-{minutes}m"
             # Build the Flux query
             query = f"""
             from(bucket: "{str(INFLUXDB_BUCKET)}")
-            |> range(start: {str(start)})  // Adjust the time range as needed
+            |> range(start: {str(start_flux)})  // Adjust the time range as needed
             |> filter(fn: (r) => r["_measurement"] == "{str(batch_id)}")
             """
 
@@ -473,9 +480,21 @@ class InfluxDBServices:
 
 
     def get_data_training(self, experiments_id, selected_metric):
+        """
+        Get training data from InfluxDB
+
+        Args:
+            experiments_id (list): List of experiment IDs.
+            selected_metric (str): Metric name to filter.
+
+        Returns:
+            list[list]: 2D list with numeric values only (no timestamps).
+        """
         if not experiments_id:
             return []
-        print("selected_metric",selected_metric)
+
+        print("selected_metric", selected_metric)
+
         # Filtro por métrica si se selecciona una
         metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
 
@@ -491,10 +510,9 @@ class InfluxDBServices:
         '''
         # Ejecutar consulta
         result = self.connector.query_api.query(org=self.connector.org, query=query)
-        
+
         # Extraer nombres de columnas y registros
         records = [record.values for table in result for record in table.records]
-        #print("records",records)
 
         if not records:
             return []
@@ -502,13 +520,25 @@ class InfluxDBServices:
         # Obtener solo las columnas numéricas (excluyendo "_time" y tags)
         value_keys = [key for key in records[0].keys() if key not in ["_time", "result", "table"]]
 
-        # Construir array 2D
+        # Convertimos en lista de listas
         data = [[rec.get(k, float('nan')) for k in value_keys] for rec in records]
 
         return data
 
     
-    def get_data_test(self, experiment_id, selected_metric):
+    def get_data_test(self, experiment_id, selected_metric, range_slider=None):
+        """
+        Get test data from InfluxDB with optional time-window filtering.
+
+        Args:
+            experiment_id (str|int): Experiment ID.
+            selected_metric (str): Metric name to filter.
+            range_slider (list[int], optional): [start_idx, end_idx] indices for time-window.
+                If None, all data is returned.
+
+        Returns:
+            np.ndarray: 2D array (rows = observations, columns = fields).
+        """
         try:
             if not experiment_id:
                 raise ValueError("The experiment_id cannot be None or empty.")
@@ -540,22 +570,30 @@ class InfluxDBServices:
                 return []
 
             # Ajustar longitudes (rellenar con NaN donde falten datos)
-            import numpy as np
             max_len = max(len(values) for values in field_values.values())
             for field, values in field_values.items():
                 if len(values) < max_len:
-                    # Rellenar con NaN hasta que alcance max_len
                     field_values[field].extend([np.nan] * (max_len - len(values)))
 
             # Armar array 2D (cada columna es un _field, cada fila una observación)
+            import numpy as np
             sorted_fields = sorted(field_values.keys())
             matrix = np.column_stack([field_values[field] for field in sorted_fields])
+
+            # ✅ Filtrar por range_slider
+            if range_slider is not None and len(range_slider) == 2:
+                start_idx, end_idx = range_slider
+                if 0 <= start_idx < matrix.shape[0] and 0 < end_idx <= matrix.shape[0]:
+                    matrix = matrix[start_idx:end_idx, :]
+                else:
+                    print("⚠️ range_slider fuera de rango en get_data_test, devolviendo todo el dataset")
 
             return matrix
 
         except Exception as e:
             print(f"Error retrieving test data for experiment_id {experiment_id}: {e}")
-            return []
+        return []
+
 
     def get_recent_experiment_ids(self, bucket: str, minutes: int = 5):
         """
@@ -659,7 +697,7 @@ class InfluxDBServices:
 
         except Exception as e:
             # Handle any unexpected error and return empty DataFrame
-            print(f"Error retrieving experiment_ID from bucket '{bucket_name}': {e}")
+            print(f"Error retrieving experiment_ID from bucket '{self.connector.bucket}': {e}")
             return pd.DataFrame(columns=['experiment_id', 'num_points'])
 
     def get_data_experiment_id(self, experiment_id: str, minutes: int = 5) -> pd.DataFrame:
@@ -680,6 +718,12 @@ class InfluxDBServices:
             |> range(start: -{minutes}m)
             |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_id}")
             |> limit(n: 1)  // Stop early as we only need to check for existence
+            '''
+            query = f'''
+            from(bucket: "{self.connector.bucket}")
+            |> range(start: 0)
+            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_id}")
+            
             '''
 
             result = self.connector.query_api.query(org=self.connector.org, query=query)

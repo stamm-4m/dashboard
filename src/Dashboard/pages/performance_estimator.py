@@ -21,7 +21,7 @@ def performance_estimator_layout():
                             # Display experiment-id and model-selected-display
                             dbc.Col([
                                 html.Div([
-                                    html.Label("Selected model:"),
+                                    html.Label("Deployed model:"),
                                     html.Br(),
                                     html.Label(id="model-selected-display"),
                                 ]

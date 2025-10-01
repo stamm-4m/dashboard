@@ -72,11 +72,33 @@ def toggle_monitoring(n):
         Output("online-link", "className"),
     ],
     Input("url", "pathname"),
+    Input("store-selected-state", "data"),  
 )
-def update_active_links(pathname):
-    # Add "active" class only if the URL matches
-    offline_class = "sidebar-link ms-4 active" if pathname == "/soft-sensors/offline" else "sidebar-link ms-4"
-    online_class = "sidebar-link ms-4 active" if pathname == "/soft-sensors/online" else "sidebar-link ms-4"
+def update_active_links(pathname, store_data):
+    """
+    Update sidebar link classes based on pathname and the 'online' state stored.
+    - If online=True → highlight online link, disable offline.
+    - If online=False → highlight offline link, disable online.
+    """
+
+    # valores por defecto
+    offline_class = "sidebar-link ms-4"
+    online_class = "sidebar-link ms-4"
+
+    # determinar si online está habilitado en el store
+    online_state = store_data.get("online") if store_data else False
+
+    if online_state:
+        # online habilitado → marcar como activo si coincide con URL
+        online_class += " active"
+        offline_class += " disabled"
+        # offline se mantiene inactivo
+    else:
+        # offline habilitado → marcar como activo si coincide con URL
+        offline_class += " active"
+        online_class += " disabled"
+        # online se mantiene inactivo
+
     return offline_class, online_class
 
 @dash.callback(

@@ -14,7 +14,7 @@ root_logger.setLevel(logging.DEBUG)
 # Evitar múltiples handlers si se recarga
 if not root_logger.hasHandlers():
     handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(levelname)s:%(message)s')
+    formatter = logging.Formatter('%(levelname)s:%(name)s:%(funcName)s: %(message)s')
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
 

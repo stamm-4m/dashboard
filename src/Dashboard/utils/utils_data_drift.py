@@ -12,6 +12,8 @@ from Dashboard.drift_detectors_pack.drift_detectors.multivariate.mmd.detector im
 
 from Dashboard.drift_detectors_pack.drift_detectors.drift_detector import get_metadata
 
+logger = logging.getLogger(__name__)
+
 def sanitize_data(data):
     """
     Ensure data is numeric and free of NaN/Inf values.
@@ -38,7 +40,7 @@ def sanitize_data(data):
     
     return data
 
-def get_result_metric(score, data_training, data_test,param_dinamic_values):
+def get_result_metric(score, data_training, data_test,param_dinamic_values,online: bool = False):
     """
     Executes the selected drift detection algorithm and returns the result.
 
@@ -46,11 +48,12 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
         score (str): The name of the drift detection algorithm to use.
         data_training (array-like): Reference dataset (training).
         data_test (array-like): Test dataset (incoming/production).
+        online(boolean):  True/False
 
     Returns:
         str or list: Formatted drift score or list of detected drift indices/statuses.
     """
-    logging.info(f"Received score: {score}")
+    logger.info(f"Received score: {score}")
     
     score = score.strip()
     params = param_dinamic_values.get(score, {})
@@ -61,28 +64,28 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
             bins = int(params.get('bins') or 10)
             epsilon = float(params.get('epsilon', 1e-8))
             threshold = float(params.get('threshold') or 0.05)
-            logging.info("Calculating PSI (Population Stability Index)...")
-            psi = PSI(threshold=threshold)
+            logger.info("Calculating PSI (Population Stability Index)...")
+            psi = PSI(threshold=threshold,online=online)
             result = psi.calculate(data_training, data_test,bins,epsilon)
-            logging.info(f"PSI result: {result}")
+            logger.info(f"PSI result: {result}")
             return result
 
         # ADWIN (ADaptive WINdowing)
         elif score == "ADWIN":
             delta = float(params.get('delta') or 0.002)
-            logging.info("Calculating ADWIN (ADaptive WINdowing)...")
-            adwin = Adwin()
-            result = adwin.calculate(data_test, delta)
-            logging.info(f"ADWIN result: {result}")
+            logger.info("Calculating ADWIN (ADaptive WINdowing)...")
+            adwin = Adwin(online=online)
+            result = adwin.calculate(data_test, delta,)
+            logger.info(f"ADWIN result: {result}")
             return result
 
         # Kolmogorov-Smirnov Detector
         elif score == "KS":
             alpha = float(params.get('alpha') or 0.05)
-            logging.info("Calculating KSDetector (Kolmogorov-Smirnov Test)...")
-            ks = KSDetector()
+            logger.info("Calculating KSDetector (Kolmogorov-Smirnov Test)...")
+            ks = KSDetector(online=online)
             result = ks.calculate(data_training, data_test,alpha)
-            logging.info(f"KS result: {result}")
+            logger.info(f"KS result: {result}")
             return result
 
         # KDQTree Detector
@@ -90,7 +93,7 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
             k_neighbors = float(params.get('k_neighbors') or 5)
             ks_method = str(params.get('ks_method') or "asymp")
             alpha = float(params.get('alpha') or 0.25)
-            logging.info("Calculating KDQTree...")
+            logger.info("Calculating KDQTree...")
             data_training_reshaped = np.array(data_training).reshape(-1, 1)
             data_test_reshaped = np.array(data_test).reshape(-1, 1)
             data_test_reshaped = sanitize_data(data_test_reshaped)
@@ -100,28 +103,28 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
                                ks_method,
                                alpha)
             result = detector.calculate(data_test_reshaped)
-            logging.info(f"KDQTree result: {result}")
+            logger.info(f"KDQTree result: {result}")
             return result
         
         # MMDDetector Detector
         elif score == "MMD":
             gamma = float(params.get('gamma') or 1.0)
             threshold = float(params.get('threshold') or 0.05)
-            logging.info("Calculating MMDDetector...")
+            logger.info("Calculating MMDDetector...")
             data_training_reshaped = np.array(data_training).reshape(-1, 1)
             data_test_reshaped = np.array(data_test).reshape(-1, 1)
             detector = MMDDetector(gamma=gamma, threshold=threshold)
             detector.set_reference_data(data_training_reshaped)
 
             result = detector.calculate(test_data=data_test_reshaped)
-            logging.info(f"MMDDetector result: {result}")
+            logger.info(f"MMDDetector result: {result}")
             return result
         # PCA-CD Change Detection 
         elif score == "PCA-CD":
             n_components = int(params.get('n_components') or 2)
             csd_threshold = float(params.get('csd_threshold') or 0.1)
             kl_threshold = float(params.get('kl_threshold') or 0.05)
-            logging.info("Calculating PCA-CD Detector...")
+            logger.info("Calculating PCA-CD Detector...")
             data_training_reshaped = np.array(data_training).reshape(-1, 1)
             data_test_reshaped = np.array(data_test).reshape(-1, 1)
 
@@ -129,23 +132,23 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values):
             detector.set_reference_data(data_training_reshaped)
 
             result = detector.calculate(test_data=data_test_reshaped)
-            logging.info(f"PCA-CD Detector result: {result}")
+            logger.info(f"PCA-CD Detector result: {result}")
             return result
         
         # Unknown algorithm
         else:
-            logging.error(f"Unknown score type: {score}")
+            logger.error(f"Unknown score type: {score}")
             raise ValueError(f"Unknown score type: {score}")
 
     except Exception as e:
-        logging.error(f"Error occurred while processing '{score}': {e}", exc_info=True)
+        logger.error(f"Error occurred while processing '{score}': {e}", exc_info=True)
         return None
 
 # Function to get the parameter information and description of drift detectors
 def get_detector_description(detector_selected):
     # Log the input parameter for debugging purposes
     print("detector_selected",detector_selected)
-    logging.debug(f"Received detector: {detector_selected}")
+    logger.debug(f"Received detector: {detector_selected}")
     default_response = {
             "name": "Unknown Metric",
             "thresholds": {"low": "N/A", "moderate": "N/A", "high": "N/A"},
@@ -190,7 +193,7 @@ def get_detector_description(detector_selected):
             md_drift_detector = detector.metadata
         # Handle unknown detector names
         else:
-            logging.error(f"Unknown detector type: {detector_selected}")
+            logger.error(f"Unknown detector type: {detector_selected}")
             raise ValueError(f"Unknown detector type: {detector_selected}")
         
         detector_description = load_estimator_descriptions(detector_selected,md_drift_detector)
@@ -205,7 +208,7 @@ def get_detector_description(detector_selected):
 
     except Exception as e:
         # Log the exception with full traceback for easier debugging
-        logging.error(f"Error occurred while processing {detector_selected}: {e}", exc_info=True)
+        logger.error(f"Error occurred while processing {detector_selected}: {e}", exc_info=True)
         return None
 
 def get_metrics_score_options():
@@ -230,7 +233,7 @@ def get_metrics_score_options():
         for name, md in mds.items():
             metrics.append((md["acronym"], name))
     except Exception as e:
-        logging.error(f"Error processing metadata score metrics: {e}")
+        logger.error(f"Error processing metadata score metrics: {e}")
 
     return [{"label": k, "value": k} for k, v in sorted(metrics)]
 
@@ -281,9 +284,9 @@ def load_estimator_descriptions(selected_estimator, metadata_dict=None):
             }
 
     except Exception as e:
-        logging.error(f"Error retrieving information for {selected_estimator}: {e}")
+        logger.error(f"Error retrieving information for {selected_estimator}: {e}")
 
-    logging.warning(f"Detector not found: {selected_estimator}")
+    logger.warning(f"Detector not found: {selected_estimator}")
     return default_response
         
 def parse_markdown_table(markdown_str: str) -> pd.DataFrame:

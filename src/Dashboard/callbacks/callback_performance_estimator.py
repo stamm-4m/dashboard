@@ -13,7 +13,9 @@ from Dashboard.utils.utils_performance_estimator import get_next_color,reload_mo
 from Dashboard.utils.utils_global import disabled_figure, generate_prediction_name
 #from drift_detectors_pack.drift_detectors.drift_detector import DisagreementMetricLoader
 
-        # Function to update the options of the existing models
+logger = logging.getLogger(__name__)  # usa el nombre del módulo como logger
+
+# Function to update the options of the existing models
 @dash.callback(
             Output('soft-sensor-input-estimator', 'options'),
             Input('soft-sensor-input-estimator', 'n_clicks')
@@ -181,18 +183,20 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     df_bach = df_bach.sort_values("_time")
 
     timestamps = df_bach["_time"].tolist()
-    if range_slider[0] < 0 or range_slider[1] >= len(timestamps):
+    logger.info(f"range_slider: {range_slider}")
+    if range_slider[0] < 0 or range_slider[1] > len(timestamps):
         print("⚠️ Invalid time window indices")
         return fig
 
     start_time = timestamps[range_slider[0]]
-    end_time = timestamps[range_slider[1]]
+    end_time = timestamps[range_slider[1]-1]
     df_window = df_bach[(df_bach["_time"] >= start_time) & (df_bach["_time"] <= end_time)]
     if df_window.empty:
         print("⚠️ No data in selected window")
         return fig
 
     # 🔹 MODE 1: Update traces when time window changes
+    logger.info(f"triggered_id: {triggered_id}")
     if triggered_id == "time-window-size":
         new_data = []
         for trace in fig.data:
@@ -305,6 +309,7 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     prevent_initial_call=True
 )
 def update_metrics_table(models_selected, experiment_id, model_data_selected, existing_data, range_slider, metric_selected):
+    print(f"range_slider: {range_slider}")
     if not models_selected or not model_data_selected or not experiment_id or not range_slider or not metric_selected:
         return dash.no_update, dash.no_update, dash.no_update
     
@@ -325,7 +330,7 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
     start_idx, end_idx = range_slider
     if start_idx < 0 or end_idx >= len(df_bach):
         return dash.no_update, dash.no_update, dash._no_update
-
+    print(f'df_bach.iloc[start_idx:end_idx+1]: {df_bach.iloc[start_idx:end_idx+1]}')
     df_window = df_bach.iloc[start_idx:end_idx+1]
     if df_window.empty:
         return dash.no_update, dash.no_update, dash.no_update
@@ -405,21 +410,72 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
     Input("store-selected-state", "data"),
     Input("time-window-size", "value")
 )
-def update_window_size_slider_labels(data,slider_range):
+def update_window_size_slider_labels(data, slider_range):
+    """
+    Update the labels and maximum value of the time window slider 
+    based on available data for the selected experiment.
+
+    Behavior:
+        - If no experiment is selected, the function returns an empty label and 0.
+        - First, it attempts to fetch online data (last 5 minutes).
+            * Displays total number of elements available online.
+            * Shows start and end times according to the slider range.
+            * Displays the number of elements selected within the slider window.
+        - If no online data is found, it falls back to batch data.
+            * Displays total number of elements in the batch.
+            * Shows start and end times according to the slider range.
+            * Displays the number of elements selected within the slider window.
+        - If no data is found at all, it returns an empty label and 0.
+
+    Args:
+        data (dict): Dash store state, expected to contain the selected experiment ID.
+        slider_range (list[int]): The [start, end] indices of the slider selection.
+
+    Returns:
+        tuple:
+            - str: The label describing the time range and number of elements.
+            - int: The maximum slider value (total number of available timestamps).
+    """
     if not data or "selected_experiment" not in data or not data["selected_experiment"]:
         print("No experiment ID Selected")
         return "", 0
+    
+    # Consulta últimos datos online (últimos 5 min)
+    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'], 5)
 
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
-    start_idx, end_idx = slider_range
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
-        start_time = timestamps[start_idx] if start_idx < len(timestamps) else timestamps[0]
-        end_time = timestamps[end_idx] if end_idx < len(timestamps) else timestamps[-1]
+        n_total = len(timestamps)
+
+        # Ajustar con slider
+        start_idx, end_idx = slider_range
+        start_time = timestamps[start_idx] if start_idx < n_total else timestamps[0]
+        end_time = timestamps[end_idx] if end_idx < n_total else timestamps[-1]
 
         start_str = pd.to_datetime(start_time).strftime('%Y-%m-%d %H:%M:%S')
         end_str = pd.to_datetime(end_time).strftime('%Y-%m-%d %H:%M:%S')
 
-        return f"From: {start_str}  ➡  To: {end_str}", len(timestamps)
+        # Número de elementos en la selección del slider
+        n_selected = end_idx - start_idx if end_idx >= start_idx else 0
+
+        return f"Last {n_total} elements - Selected {n_selected} ➡ From: {start_str} To: {end_str}", n_total
+
+    # Si no hay datos online, se consulta batch completo
+    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
+    if not dfc.empty:
+        timestamps = sorted(dfc["_time"].dropna().unique())
+        n_total = len(timestamps)
+
+        start_idx, end_idx = slider_range
+        start_time = timestamps[start_idx] if start_idx < n_total else timestamps[0]
+        end_time = timestamps[end_idx] if end_idx < n_total else timestamps[-1]
+
+        start_str = pd.to_datetime(start_time).strftime('%Y-%m-%d %H:%M:%S')
+        end_str = pd.to_datetime(end_time).strftime('%Y-%m-%d %H:%M:%S')
+
+        n_selected = end_idx - start_idx if end_idx >= start_idx else 0
+
+        return f"From: {start_str} ➡ To: {end_str} - Selected {n_selected}", n_total
+    
     return "", 0
 

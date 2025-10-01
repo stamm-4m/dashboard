@@ -10,29 +10,27 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 
-
-
 @dash.callback(
+    Output("experiment-dropdown", "value"),
     Output("store-selected-state", "data"),
-    Input("experiment-dropdown", "value")
-)
-def store_selected_experiment(experiment_id):
-    return {"selected_experiment": experiment_id} if experiment_id else {}
-        
-@dash.callback(
-    Output({"type": "experiment-dropdown", "index": MATCH}, "value"),
-    Output({"type": "store-selected-state", "index": MATCH}, "data"),  # Added MATCH
-    State({"type": "experiment-dropdown", "index": MATCH}, "value"),
-    Input({"type": "store-selected-state", "index": MATCH}, "data"),  # Must also use MATCH
+    Input("experiment-dropdown", "value"),   # Dispara el callback
+    State("store-selected-state", "data"),   # Solo se lee, no dispara
     prevent_initial_call=True
 )
-def sync_experiment_selection(experiment_id, store_data):
-    # If there is a stored value and it has not been changed in the dropdown, restore it
-    if store_data and "selected_experiment" in store_data and experiment_id is None:
+def sync_dropdown_and_store(dropdown_value, store_data):
+    # Caso 1: si el dropdown está vacío pero hay algo guardado en el store → restaurar
+    if (not dropdown_value) and store_data and "selected_experiment" in store_data:
         return store_data["selected_experiment"], store_data
 
-    # If the user selects something new, store it
-    return experiment_id, {"selected_experiment": experiment_id} if experiment_id else {}
+    # Caso 2: si el usuario selecciona algo nuevo → guardar en el store
+    if dropdown_value:
+        store_data = store_data or {}
+        store_data["selected_experiment"] = dropdown_value
+        return dropdown_value, store_data
+
+    # Si nada aplica → no cambiar nada
+    return dash.no_update, dash.no_update
+
     
 @dash.callback(
     [Output("experiment-dropdown", "options")],
@@ -103,38 +101,47 @@ def update_table_data(experiment_id):
 
 @dash.callback(
     [Output("offline-link", "disabled"),
-     Output("online-link", "disabled")],
-    Input("experiment-dropdown", "value")
+     Output("online-link", "disabled"),
+     Output("store-selected-state", "data",allow_duplicate=True)],
+    Input("experiment-dropdown", "value"),
+    State("store-selected-state", "data"),
+    prevent_initial_call=True
 )
-def toggle_links(experiment_selected):
+def toggle_links(experiment_selected, store_data):
     """
     Enable or disable the 'Online' and 'Offline' links based on whether the selected experiment
-    has received data within the last 5 minutes.
+    has received data within the last 5 minutes. Update only the 'online' key in dcc.Store.
 
     Args:
         experiment_selected (str): The selected experiment ID from the dropdown.
+        store_data (dict): Current data in the store.
 
     Returns:
-        (bool, bool): Tuple to set the 'disabled' state of 'offline-link' and 'online-link'.
+        (bool, bool, dict): States for offline-link, online-link and updated store data.
     """
+    # Si no había nada en el store, inicializarlo como diccionario vacío
+    if store_data is None:
+        store_data = {}
+
     if not experiment_selected:
-        # No experiment selected; enable offline by default
-        return False, True
+        store_data["online"] = False
+        return False, True, store_data
 
     try:
         df = influxdb_handler.get_data_experiment_id(experiment_selected, minutes=5)
 
         if df.shape[0] > 0:
-            # Recent data found → enable 'online', disable 'offline'
-            return True, False
+            store_data["online"] = True
+            return True, False, store_data
 
-        # No recent data → enable 'offline', disable 'online'
-        return False, True
+        store_data["online"] = False
+        return False, True, store_data
 
     except Exception as e:
         print(f"[Error] toggle_links: {e}")
-        # In case of error, enable offline by default
-        return False, True
+        store_data["online"] = False
+        return False, True, store_data
+
 
 @dash.callback(
             Output('project-details', 'children'),

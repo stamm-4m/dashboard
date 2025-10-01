@@ -18,14 +18,20 @@ def data_drift_layout():
                     dbc.Row([
                         dbc.Col([
                             html.Label("Monitoring soft sensor:"),
-                            dcc.Dropdown(
-                                id='soft-sensor-input',
-                                options=model_name_options,
-                                className='mb-2',
-                                searchable=True,
-                                placeholder="Select soft sensors",
-                                style={'width': '100%', 'whiteSpace': 'normal'}
-                            ),
+                            dcc.Loading(
+                                id="loading-models-soft",
+                                type="circle",
+                                color="#0d6efd",  # Azul Bootstrap
+                                fullscreen=False,
+                                children=dcc.Dropdown(
+                                        id='soft-sensor-input',
+                                        options=model_name_options,
+                                        className='mb-2',
+                                        searchable=True,
+                                        placeholder="Select soft sensors",
+                                        style={'width': '100%', 'whiteSpace': 'normal'}
+                                    )
+                                ),
                         ], width=6),
 
                         dbc.Col([
@@ -38,20 +44,39 @@ def data_drift_layout():
                                 placeholder="Select Metric Score",
                                 style={'width': '100%'}
                             ),
-                        ], width=3),
-
+                        ], width=6)
+                        
+                    ]),
+                    dbc.Row([
                         dbc.Col([
                             html.Label("Experiment ID:"),
                             dcc.Dropdown(
                                 id='input-experiment-dropdown',
-                                options=experiments_id,
-                                className='mb-2',
-                                searchable=True,
-                                placeholder="Select experiment ID",
-                                style={'width': '100%'}
-                            ),
-                        ], width=3)
-                        
+                                    options=experiments_id,
+                                    className='mb-2',
+                                    searchable=True,
+                                    placeholder="Select experiment ID",
+                                    style={'width': '100%'}
+                                ),
+                        ], width=6),
+                        dbc.Col([
+                            # Time range
+                            dbc.Label("Time range selection:"),
+                            dcc.RangeSlider(
+                                id="time-window-size-drift",
+                                min=0,
+                                max=0,
+                                step=1,
+                                marks=None,
+                                value=[0, 100],
+                                tooltip={
+                                        "placement": "bottom",
+                                        "always_visible": True,
+                                        "style": {"color": "LightSteelBlue", "fontSize": "20px"},
+                                }
+                                ),
+                            html.Div(id="time-ws-slider-labels-drift", style={"textAlign": "center", "marginBottom": "20px"}),
+                        ],width=6)
                     ])
                 ])
             ], className="mb-3 shadow-sm"),
@@ -84,10 +109,10 @@ def data_drift_layout():
                                 dbc.Row([
                                     dbc.Col([
                                         dcc.Graph(id="density-plot", figure={})
-                                    ], width=6),
-                                    dbc.Col([
-                                        dcc.Graph(id='density-plot-hist', figure={})
-                                    ], width=6),
+                                    ], width=12)#,
+                                    #dbc.Col([
+                                    #    dcc.Graph(id='density-plot-hist', figure={})
+                                    #], width=6),
                                 ], className="mb-4")
                             ],
                          

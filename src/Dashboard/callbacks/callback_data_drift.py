@@ -5,19 +5,26 @@ import dash_bootstrap_components as dbc
 from dash import html
 import plotly.graph_objs as go
 import numpy as np
+import pandas as pd
 import scipy.stats as stats
 import logging
 from Dashboard.utils import model_information
 from Dashboard.utils.utils_data_drift import get_result_metric,get_detector_description
+from Dashboard.utils.utils_sofsensors_offline import reload_models
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(levelname)s:%(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+logger = logging.getLogger(__name__)
+
 
 UNIVARIABLE_METRICS = ["ADWIN","KS","PSI"]
+
+@dash.callback(
+    Output('soft-sensor-input', 'options'),
+    Input('soft-sensor-input', 'n_clicks')
+)
+def reload_model_options(n_clicks):
+    reload_models()
+    return model_information.get_model_name_options()
 
 # Load selected metrics
 @dash.callback(
@@ -127,7 +134,7 @@ def update_metrics_section(selected_metric, selected_model):
 # Callback to generate density plots
 @dash.callback(
     Output("density-plot", "figure"),
-    Output("density-plot-hist", "figure"),
+    #Output("density-plot-hist", "figure"),
     Output("metrics-result", "children"),
     Input("add-metric-button", "n_clicks"),
     State("soft-sensor-input", "value"),
@@ -135,9 +142,10 @@ def update_metrics_section(selected_metric, selected_model):
     State("input-model-dropdown", "value"),
     State("metric-score-dropdown", "value"),
     Input("store-metric-params", "data"),
+    Input("time-window-size-drift", "value"),
     prevent_initial_call=True
 )
-def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, metric_score, param_dinamic_values):
+def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, metric_score, param_dinamic_values,range_slider):
     print("metric_score: ", metric_score)
     if not (soft_sensor and experiment_id):
         print("dash.no_update")
@@ -146,10 +154,10 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
     band_univariable = metric_score.strip() in UNIVARIABLE_METRICS
     print(band_univariable)
     print(selected_input)
-    logging.warning(" values: band_univariable {band_univariable},  selected_input {selected_input}")
+    logger.warning(" values: band_univariable {band_univariable},  selected_input {selected_input}")
 
     if band_univariable and not selected_input:
-        logging.warning(" No update: band_univariable and selected_input")
+        logger.warning(" No update: band_univariable and selected_input")
         return dash.no_update
 
     # 1. Retrieve data from the selected model's YAML
@@ -167,14 +175,17 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
 
     # 3. Query InfluxDB to obtain training and test data
     training_data = influxdb_handler.get_data_training(experiments_id, selected_input)  # Implement function
-    test_data = influxdb_handler.get_data_test(experiment_id, selected_input)  # Implement function
+    test_data = influxdb_handler.get_data_test(experiment_id, selected_input,range_slider)  # Implement function
 
     test_data = np.array(test_data).ravel()
     training_data = np.array(training_data).ravel()
 
+    # CAUTION: is only for test when no exists any trainig data
+    # --------------------------------------------------------- 
     if len(training_data) == 0:
         noise = np.random.normal(0, 0.3, size=test_data.shape)
         training_data = test_data + noise
+    # --------------------------------------------------------- 
 
     fig = go.Figure()
     fig2 = go.Figure()
@@ -232,12 +243,19 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
             template="plotly_white"
         )
 
-    metric_result = get_result_metric(metric_score, training_data, test_data, param_dinamic_values)
+    dfo = influxdb_handler.get_data_by_batch_id2(experiment_id,5)
+    str_mode = False
+    if not dfo.empty:
+        str_mode = True
+
+    metric_result = get_result_metric(metric_score, training_data, test_data, param_dinamic_values,str_mode)
 
     if band_univariable:
-        return fig2, fig, render_dynamic_result(metric_result)
+        #return fig2, fig, render_dynamic_result(metric_result)
+        return fig2, render_dynamic_result(metric_result)
     else:
-        return go.Figure(), go.Figure(), render_dynamic_result(metric_result)
+        #return go.Figure(), go.Figure(), render_dynamic_result(metric_result)
+        return go.Figure(), render_dynamic_result(metric_result)
 
 @dash.callback(
     Output("store-metric-params", "data"),
@@ -298,3 +316,93 @@ def has_empty_values(params: dict) -> bool:
     Check if there are any empty values in the nested dictionary.
     """
     return any(v == '' for subdict in params.values() for v in subdict.values())
+
+
+@dash.callback(
+    Output("time-ws-slider-labels-drift", "children"),
+    Output("time-window-size-drift", "max"),
+    Input("store-selected-state", "data"),
+    Input("time-window-size-drift", "value")
+)
+def update_size_slider_labels(data, slider_range):
+    """
+    Update the labels and maximum value of the time window slider 
+    based on available data for the selected experiment.
+
+    Behavior:
+        - If no experiment is selected, the function returns an empty label and 0.
+        - First, it attempts to fetch online data (last 5 minutes).
+            * Displays total number of elements available online.
+            * Shows start and end times according to the slider range.
+            * Displays the number of elements selected within the slider window.
+        - If no online data is found, it falls back to batch data.
+            * Displays total number of elements in the batch.
+            * Shows start and end times according to the slider range.
+            * Displays the number of elements selected within the slider window.
+        - If no data is found at all, it returns an empty label and 0.
+
+    Args:
+        data (dict): Dash store state, expected to contain the selected experiment ID.
+        slider_range (list[int]): The [start, end] indices of the slider selection.
+
+    Returns:
+        tuple:
+            - str: The label describing the time range and number of elements.
+            - int: The maximum slider value (total number of available timestamps).
+    """
+    if not data or "selected_experiment" not in data or not data["selected_experiment"]:
+        print("No experiment ID Selected")
+        return "", 0
+    
+    # Consulta últimos datos online (últimos 5 min)
+    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'], 5)
+
+    if not dfc.empty:
+        timestamps = sorted(dfc["_time"].dropna().unique())
+        n_total = len(timestamps)
+
+        # Ajustar con slider
+        start_idx, end_idx = slider_range
+        start_time = timestamps[start_idx] if start_idx < n_total else timestamps[0]
+        end_time = timestamps[end_idx] if end_idx < n_total else timestamps[-1]
+
+        start_str = pd.to_datetime(start_time).strftime('%Y-%m-%d %H:%M:%S')
+        end_str = pd.to_datetime(end_time).strftime('%Y-%m-%d %H:%M:%S')
+
+        # Número de elementos en la selección del slider
+        n_selected = end_idx - start_idx if end_idx >= start_idx else 0
+
+        return f"Last {n_total} elements - Selected {n_selected} ➡ From: {start_str} To: {end_str}", n_total
+
+    # Si no hay datos online, se consulta batch completo
+    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
+    if not dfc.empty:
+        timestamps = sorted(dfc["_time"].dropna().unique())
+        n_total = len(timestamps)
+
+        start_idx, end_idx = slider_range
+        start_time = timestamps[start_idx] if start_idx < n_total else timestamps[0]
+        end_time = timestamps[end_idx] if end_idx < n_total else timestamps[-1]
+
+        start_str = pd.to_datetime(start_time).strftime('%Y-%m-%d %H:%M:%S')
+        end_str = pd.to_datetime(end_time).strftime('%Y-%m-%d %H:%M:%S')
+
+        n_selected = end_idx - start_idx if end_idx >= start_idx else 0
+
+        return f"From: {start_str} ➡ To: {end_str} - Selected {n_selected}", n_total
+    
+    return "", 0
+
+@dash.callback(
+    Output("input-experiment-dropdown", "value"),
+    Input("store-selected-state", "data"),
+    prevent_initial_call=False 
+)
+def load_selected_experiment(store_data):
+    """
+    Load the stored experiment ID into the dropdown on app load.
+    """
+    if store_data and "selected_experiment" in store_data:
+        return store_data["selected_experiment"]
+    return None
+
