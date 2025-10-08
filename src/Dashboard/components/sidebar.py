@@ -9,6 +9,8 @@ def sidebar(session_data = None):
         html.H2("STAMM", className="fw-bold text-center"),
         dcc.Store(id="store-selected-state", storage_type="local"),
         dcc.Store(id='model-data-store', storage_type='local'),
+        dcc.Store(id="previous-model", storage_type="local"),
+        dcc.Store(id="store-prediction-control", data={"status": "stopped"}),
         # Stores the selection of Online or Offline data
         dcc.Store(id='store-selected-view', storage_type='local'),
         dcc.Store(id='store-selected-bucket', storage_type='local'),
@@ -38,7 +40,7 @@ def sidebar(session_data = None):
                 # Main soft sensors link
                 dbc.NavLink(
                     html.Span([html.Span("2", className="circle-number"),html.Span("Soft sensors", className="nav-text")], className="nav-item-content"),
-                    href="#",
+                    href=None,
                     className="sidebar-link",
                     id="step-2",
                     active="exact"
@@ -50,14 +52,12 @@ def sidebar(session_data = None):
                             "Offline",
                             href="/soft-sensors/offline",
                             className="sidebar-link ms-4",  # Margin for sublevel
-                            disabled=True,  # Default value disabled
                             id="offline-link",
                         ),
                         dbc.NavLink(
                             "Online",
                             href="/soft-sensors/online",
                             className="sidebar-link ms-4",  # Margin for sublevel
-                            disabled=True,  # Default value disabled
                             id="online-link",
                         ),
                         # Commented for we will working next version
@@ -69,7 +69,7 @@ def sidebar(session_data = None):
                 # Main monitoring
                 dbc.NavLink(
                     html.Span([html.Span("3", className="circle-number"),html.Span("Monitoring", className="nav-text")], className="nav-item-content"),
-                    href="#",
+                    href=None,
                     className="sidebar-link",
                     active="exact",
                     id="step-3",

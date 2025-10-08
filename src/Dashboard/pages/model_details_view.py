@@ -1,6 +1,46 @@
 import dash.html as html
 import dash_bootstrap_components as dbc
 
+def generate_output_items(predictions):
+    """Generate a styled list of output items with a badge and all available fields."""
+    if not predictions:
+        return html.P("No output information available.")
+
+    items = []
+    for pred in predictions:
+        # Extraer nombre (Badge) y el resto de los campos
+        name = pred.get("name", "Unnamed Output")
+
+        # Contenedor para los demás campos
+        details = []
+        for key, value in pred.items():
+            if key == "name":
+                continue  # el badge se muestra arriba
+            if isinstance(value, dict):
+                subitems = [f"{subkey}: {subval}" for subkey, subval in value.items()]
+                value_str = ", ".join(subitems)
+            else:
+                value_str = str(value)
+
+            details.append(
+                html.Div([
+                    html.Span(f"{key}: ", className="fw-bold text-secondary"),
+                    html.Span(value_str)
+                ], className="ms-2")
+            )
+
+        # Cada predicción se muestra en un ListGroupItem con Badge + detalles
+        items.append(
+            dbc.ListGroupItem(
+                html.Div([
+                    dbc.Badge(name, color="success", className="me-2 mb-1"),
+                    html.Div(details, className="mt-1")
+                ])
+            )
+        )
+
+    return dbc.ListGroup(items, flush=True)
+
 def generate_model_details_view(config):
     if not config:
         return html.P("The configuration for the selected model was not found.", style={'textAlign': 'center'})
@@ -10,7 +50,7 @@ def generate_model_details_view(config):
     model_pack = model_desc.get('packages', [])
     model_train = config['training_information']
     features = config['inputs'].get('features', 'N/A')
-    predictions = config['outputs'].get('predictions', 'N/A')
+    predictions = config.get("outputs", {}).get("information", [])
 
     name = model_ident.get('name', 'N/A')
     version = model_ident.get('version', 'N/A')
@@ -27,14 +67,6 @@ def generate_model_details_view(config):
     language = model_desc.get('language', 'N/A')
 
     hyperparameters = model_train.get('hyperparameters', {})
-
-    model_data = {
-        "model_file": model_file,
-        "model_name": model_name,
-        "language": language,
-        "predictions": predictions,
-        "features": features
-    }
 
     return (
         dbc.Accordion(
@@ -109,12 +141,7 @@ def generate_model_details_view(config):
                         dbc.Row([
                             dbc.Col(html.Div([
                                 html.H4("Outputs"),
-                                dbc.ListGroup([
-                                    dbc.ListGroupItem(html.Span([
-                                        dbc.Badge(prediction["name"], color="success", className="me-2"),
-                                        f"{prediction['description']} ({prediction['units']})",
-                                    ])) for prediction in predictions
-                                ], flush=True),
+                                generate_output_items(predictions)
                             ]), width=12),
                         ]),
                     ],

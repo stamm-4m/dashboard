@@ -24,7 +24,7 @@ def softsensor_online_layout():
                                     dbc.Label("Model Name:"),
                                     dcc.Dropdown(
                                         id='model-selector',
-                                        options=model_name_options,
+                                        options=[],
                                         placeholder="Select a model",
                                         style={
                                             'width': '100%',
@@ -41,12 +41,22 @@ def softsensor_online_layout():
                             dbc.Col(
                                 [
                                     dbc.Button(
-                                        "Run",
+                                        "Show prediction",
                                         id="run-on",
                                         n_clicks=0,
                                         color="primary",
                                         style={
                                             'width': '60%',
+                                        },
+                                    ),
+                                    dbc.Button(
+                                        "Stop",
+                                        id="stop-on",
+                                        n_clicks=0,
+                                        color="warning",
+                                        style={
+                                            'width': '60%',
+                                            'display': 'none'
                                         },
                                     )
                                 ],
@@ -159,7 +169,6 @@ def softsensor_online_layout():
                             # Column for view control
                             dbc.Col(
                                 [html.Table(id="variable-table", className="table"),
-                                dbc.Alert(id="msj-div", is_open=False, color="info", dismissable=True),
                                 dcc.Store(id="variable-data-store", data=[])],
                             md=6,  # Column width adjusted to take up the remaining half
                                 className="d-flex justify-content-center"
@@ -181,7 +190,7 @@ def softsensor_online_layout():
                             dbc.Col(
                                 [
                                     html.Div(className='row', children=[
-                                        html.Div(id='msj-div'),
+                                        html.Div(id='toast-message'),
                                         html.Div(id='dd-output-container'),
                                         html.Div(className='twelve columns', children=[
                                             dcc.Graph(
@@ -190,8 +199,9 @@ def softsensor_online_layout():
                                             ),       
                                         dcc.Interval(id='interval-component',interval=10000,n_intervals=0),   
                                         # Store data between updates
-                                        dcc.Store(id="prediction-data", data={}),
-                                        dcc.Store(id="selected-variables", data=[]),                                  
+                                        dcc.Store(id="prediction-data", data={}, storage_type="session"),
+                                        dcc.Store(id="selected-variables", data=[]),
+                                        dcc.Store(id="store-inicio-pred", data=0),                                  
                                         ])
                                     ])
                                 ]

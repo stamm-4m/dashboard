@@ -11,9 +11,8 @@ from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils import model_information
 from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models,load_estimator_descriptions,compute_metric,reorder_dataframe_for_table
 from Dashboard.utils.utils_global import disabled_figure, generate_prediction_name
-#from drift_detectors_pack.drift_detectors.drift_detector import DisagreementMetricLoader
 
-logger = logging.getLogger(__name__)  # usa el nombre del módulo como logger
+logger = logging.getLogger(__name__) 
 
 # Function to update the options of the existing models
 @dash.callback(
@@ -458,7 +457,10 @@ def update_window_size_slider_labels(data, slider_range):
         # Número de elementos en la selección del slider
         n_selected = end_idx - start_idx if end_idx >= start_idx else 0
 
-        return f"Last {n_total} elements - Selected {n_selected} ➡ From: {start_str} To: {end_str}", n_total
+        return [f"Last {n_total} elements - Selected {n_selected}",
+                html.Br(),
+                f"➡ From: {start_str} To: {end_str}"
+                ], n_total
 
     # Si no hay datos online, se consulta batch completo
     dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
@@ -475,7 +477,10 @@ def update_window_size_slider_labels(data, slider_range):
 
         n_selected = end_idx - start_idx if end_idx >= start_idx else 0
 
-        return f"From: {start_str} ➡ To: {end_str} - Selected {n_selected}", n_total
+        return [f"From: {start_str} ➡ To: {end_str}",
+                html.Br(),
+                f"- Selected {n_selected}"
+                ], n_total
     
     return "", 0
 

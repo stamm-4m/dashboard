@@ -7,7 +7,7 @@ from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 
 
 # Calls the function again to read  'Models
-def reload_models():
+def reload_models(): 
     model_information.configurations = []
     model_information.load_all_models()
 

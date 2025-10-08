@@ -21,6 +21,7 @@ INFLUXDB_BUCKET = check_env_var("INFLUXDB_BUCKET")
 BACH_ID = os.getenv("BACH_ID")
 DB_SQLITE_DIR = os.getenv("DB_SQLITE_DIR")
 NAME_PROJECT = os.getenv("NAME_PROJECT")
+PROJECT_ID = os.getenv("PROJECT_ID")
 
 # Local InfluxDB connection variables (optional, but you can validate them if needed)
 INFLUXDB_URL_LOCAL = os.getenv("INFLUXDB_URL_LOCAL")

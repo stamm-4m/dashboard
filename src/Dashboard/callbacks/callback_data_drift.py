@@ -372,7 +372,11 @@ def update_size_slider_labels(data, slider_range):
         # Número de elementos en la selección del slider
         n_selected = end_idx - start_idx if end_idx >= start_idx else 0
 
-        return f"Last {n_total} elements - Selected {n_selected} ➡ From: {start_str} To: {end_str}", n_total
+        return [
+            f"Last {n_total} elements - Selected {n_selected}",
+            html.Br(),
+            f"➡ From: {start_str} To: {end_str}"
+        ], n_total
 
     # Si no hay datos online, se consulta batch completo
     dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
@@ -389,7 +393,10 @@ def update_size_slider_labels(data, slider_range):
 
         n_selected = end_idx - start_idx if end_idx >= start_idx else 0
 
-        return f"From: {start_str} ➡ To: {end_str} - Selected {n_selected}", n_total
+        return [f"From: {start_str} ➡ To: {end_str}",
+                html.Br(),
+                f"- Selected {n_selected}"
+        ], n_total
     
     return "", 0
 
@@ -405,4 +412,3 @@ def load_selected_experiment(store_data):
     if store_data and "selected_experiment" in store_data:
         return store_data["selected_experiment"]
     return None
-

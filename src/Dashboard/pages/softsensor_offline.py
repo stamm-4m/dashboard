@@ -47,7 +47,7 @@ def sofsensor_offline_layout():
                             dbc.Col(
                                 [
                                     dbc.Button(
-                                        "Show Simulation",
+                                        "Show prediction",
                                         id="run",
                                         n_clicks=0,
                                         color="primary",

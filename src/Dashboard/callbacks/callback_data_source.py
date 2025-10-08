@@ -3,12 +3,17 @@ from dash import Input, Output, State, dcc, html, dash_table, MATCH
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
+from Dashboard.config import NAME_PROJECT,PROJECT_ID
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
 import pandas as pd
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dash.callback(
     Output("experiment-dropdown", "value"),
@@ -142,23 +147,43 @@ def toggle_links(experiment_selected, store_data):
         store_data["online"] = False
         return False, True, store_data
 
-
 @dash.callback(
-            Output('project-details', 'children'),
-            Input("experiment-dropdown", "value")
-        )
+    Output('project-details', 'children'),
+    Output("project-name", "children"),
+    Input("experiment-dropdown", "value")
+)
 def display_project_details(value):
-    data_info = model_information.project_details()
+    """
+    Update project information and name based on the selected experiment.
 
+    This callback is triggered when the user selects a value from the
+    `experiment-dropdown`. It retrieves the project details using
+    `model_information.project_details()`, constructs a formatted display
+    for the project information, and updates both the project detail
+    section and the project name header.
+
+    Parameters
+    ----------
+    value : str
+        The selected experiment identifier from the dropdown input.
+
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - dash.html.Component : A formatted HTML view with project details.
+        - str : A string representing the project name header.
+    """
+    data_info = model_information.project_details()
+    name = f"Project name: {NAME_PROJECT}"
     if data_info:
-                
         data = {
             "description": data_info.get('description', {})
-            }
-        return generate_projects_details_view(data)
+        }
+        return generate_projects_details_view(data), name
     else:
-        return html.P("The information project not found.")
-    
+        return html.P("The information project not found."), name
+
 @dash.callback(
     Output("table-experiments-online", "data"),
     Output("experiment-message", "children"),
@@ -238,7 +263,7 @@ def update_timeseries_data_count(interval_value, interval_unit,selected_field):
         unit_map = {
             "seconds": "S",
             "minutes": "min", 
-            "hours": "H",
+            "hours": "h",
             "days": "D",
             "months": "MS"  
         }
@@ -329,3 +354,4 @@ def load_field_options(n_intervals):
     except Exception as e:
         print(f"[ERROR] load_field_options: {e}")
         return [{"label": "All fields", "value": "all"}]
+

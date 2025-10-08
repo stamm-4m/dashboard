@@ -2,8 +2,6 @@ from dash import html,dcc, dash_table
 import dash_bootstrap_components as dbc
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_global import disabled_figure
-from Dashboard.config import NAME_PROJECT
-
 
 def data_source_layout():
         
@@ -44,7 +42,8 @@ def data_source_layout():
                         persistence_type="local"
                     ),
                     # Row for model details
-                    html.H5(f"Project name: {NAME_PROJECT}", className="fw-bold"),
+                    html.H5(id="project-name", className="fw-bold"),
+
                     dbc.Label("Project description:", className="fw-bold"),
                     dbc.Row(
                         

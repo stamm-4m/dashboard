@@ -2,12 +2,10 @@ import yaml
 import os
 import pandas as pd
 import logging
-from Dashboard.config import BASE_URL_API
+from Dashboard.config import BASE_URL_API,PROJECT_ID
 from Dashboard.utils.utils_apiclient import ApiClient
 
-
-
-
+logger = logging.getLogger(__name__)
 
 # Class to manage information from ML model files
 class ModelInformation:
@@ -15,48 +13,28 @@ class ModelInformation:
     def __init__(self):
         # Create instance for Client
         self.api_client = ApiClient(BASE_URL_API)
+        self.base_project_id = PROJECT_ID
         self.configurations = []
         self.configurations_monitoring = []
-        self.variable_categories = {
-                "sensor": [
-                    "air_head_pressure", "dissolved_oxygen_concentration", "pH", 
-                    "temperature", "generated_heat", "CO2_percent_in_off_gas",
-                    "oxygen_uptake_rate", "oxygen_in_percent_in_off_gas",
-                    "carbon_evolution_rate"
-                ],
-                "actuator": [
-                    "aeration_rate", "agitator", "sugar_feed_rate", "acid_flow_rate", "base_flow_rate", 
-                    "heating/cooling_water_flow_rate", "heating_water_flow_rate", "water_for_injection/dilution",
-                    "dumped_broth_flow", "substrate_concentration", "PAA_flow", "oil_flow", "ammonia_shots"
-                ],
-                "computed_variable": [
-                    "vessel_volume", "vessel_weight"
-                ],
-                "soft_sensor": [
-                    "penicillin_concentration"
-                ],
-                "offline_measurement": [
-                    "PAA_concentration", "NH3_concentration", "offline_penicillin_concentration",
-                    "offline_biomass_concentration", "viscosity"
-                ]
-            }
-
-    def load_data_model(self, model_name):
+        
+    def load_data_model(self, model_id):
         """Loads  and adds it to the configurations list."""
         try:
-            response = self.api_client.get("metadata/"+model_name)
+            response = self.api_client.get(f"{self.base_project_id}/metadata/"+model_id)
             self.configurations.append(response)
         except Exception as e:
-            print(f" Error load model data: {e}")
+            logger.error(f" Error load model data: {e}")
 
     def load_all_models(self):
         """Loads all models"""
         try:
-            response = self.api_client.get("list_models")
-            for modelo in response['available_soft_sensors']:
-                self.load_data_model(modelo['name'])
+            response = self.api_client.get(f"{self.base_project_id}/list_models")
+            for modelo in response:
+                #logger.debug(f"modelo:{modelo}")
+                if modelo["metadata"]["status"] == "online":
+                    self.load_data_model(modelo['model_ID'])
         except Exception as e:
-            print(f" Error load all models: {e}")
+            logger.error(f" Error load all models: {e}")
 
         
 
@@ -140,66 +118,6 @@ class ModelInformation:
         # Return a list of dictionaries with label and value
         return [{'label': name, 'value': name} for name in sorted(unique_names)]
 
-    # Function to get model file information as a DataFrame
-    def get_models_dataframe(self):
-        """Returns a DataFrame with information about the loaded models."""
-        data = []
-        for config in self.configurations:
-            model_config = config.get('ml_model_configuration', {})
-
-            model_ident = model_config.get('model_identification', {})
-            model_desc = model_config.get('model_description', {})
-            model_pack = model_desc.get('packages', [])  # Asegura que sea una lista
-            model_train = model_config.get('training_information', {})
-            model_inputs = model_config.get('inputs', {}).get('features', [])
-            model_outputs = model_config.get('outputs', {}).get('predictions', [])
-
-            row = {
-                # Model Identification
-                "Name": model_ident.get('name', 'N/A'),
-                "Version": model_ident.get('version', 'N/A'),
-                "UUID": model_ident.get('UUID', 'N/A'),
-                "Author": model_ident.get('author', 'N/A'),
-                "Doi": model_ident.get('doi', 'N/A'),
-                "Creation date": model_ident.get('creation_date', 'N/A'),
-
-                # Model Description
-                "Learner": model_desc.get('learner', 'N/A'),
-                "Model type": model_desc.get('model_type', 'N/A'),
-                "Model Name": model_desc.get('model_name', 'N/A'),
-                "Description": model_desc.get('description', 'N/A'),
-                "Language": model_desc.get('language', 'N/A'),
-                "Model File": model_desc.get('config_files', {}).get('model_file', 'N/A'),
-
-                # Model Packages
-                "Packages": ', '.join(
-                    [f"{pkg.get('package', 'Unknown')} - {pkg.get('version', 'Unknown')}" for pkg in model_pack]
-                ) if isinstance(model_pack, list) else "No packages available",
-
-                # Model Description Interval
-                "Interval value": model_desc.get('input_time_interval', {}).get('time_interval', {}).get('value', 'N/A'),
-                "Interval unit": model_desc.get('input_time_interval', {}).get('time_interval', {}).get('unit', 'N/A'),
-                "Interval description": model_desc.get('input_time_interval', {}).get('description', 'N/A'),
-                "Aggregation method": model_desc.get('input_time_interval', {}).get('aggregation', {}).get('method', 'N/A'),
-                "Aggregation description": model_desc.get('input_time_interval', {}).get('aggregation', {}).get('description', 'N/A'),
-
-                # Model Training
-                "Number of instances": model_train.get('number_of_instances', 'N/A'),
-                "Number of trees": model_train.get('hyperparameters', {}).get('number_of_trees', 'N/A'),
-                "Max tree depth": model_train.get('hyperparameters', {}).get('max_tree_depth', 'N/A'),
-                "Validation": model_train.get('validation', 'N/A'),
-                "Experiments ID": model_train.get('experiments_ID', 'N/A'),
-
-                # Model Inputs/Outputs
-                "Number of Inputs": len(model_inputs),
-                "Input Names": ', '.join([input.get('name', 'Unknown') for input in model_inputs]),
-                "Number of Outputs": len(model_outputs),
-                "Output Names": ', '.join([output.get('name', 'Unknown') for output in model_outputs]),
-            }
-
-            data.append(row)
-
-        return pd.DataFrame(data)
     # Function to load inputs from configuration
     def load_inputs_from_configuration(self, model_name):
         config = self.get_configuration_by_model_name(model_name)
@@ -208,8 +126,8 @@ class ModelInformation:
         # Create options for the Dropdown
         return [{"label": feature['name'], "value": feature['name']} for feature in inputs]
 
-    def load_yaml_file_monitoring(self, filepath):
-        """Loads a YAML file and adds it to the configurations list."""
+    """def load_yaml_file_monitoring(self, filepath):
+        "Loads a YAML file and adds it to the configurations list."
         try:
             with open(filepath, 'r', encoding="utf-8") as file:
                 config = yaml.safe_load(file)
@@ -217,14 +135,14 @@ class ModelInformation:
         except FileNotFoundError:
             print(f"File not found: {filepath}")
         except yaml.YAMLError as exc:
-            print(f"Error reading the YAML file: {exc}")
+            print(f"Error reading the YAML file: {exc}")"""
 
-    def load_multiple_yaml_files_monitoring(self, folder_path):
-        """Loads all YAML files from a folder."""
+    """def load_multiple_yaml_files_monitoring(self, folder_path):
+        "Loads all YAML files from a folder."
         for filename in os.listdir(folder_path):
             if filename.endswith(".yaml") or filename.endswith(".yml"):
                 filepath = os.path.join(folder_path, filename)
-                self.load_yaml_file_monitoring(filepath)
+                self.load_yaml_file_monitoring(filepath)"""
     
     # Gets all unique categories from the 'type' field within inputs.
     def get_unique_types_models(self, model_name):
@@ -237,7 +155,8 @@ class ModelInformation:
                         #print("config: ",config)
                         return self.get_feature_categories(config)
                 else:
-                    print("Model not found in configuration")
+
+                    logger.info("Model not found in configuration")
                     return []  # Or return an empty list []
             except Exception as e:
                 print(f"Error processing get category: {e}")
@@ -245,14 +164,45 @@ class ModelInformation:
                 
     
     def get_feature_categories(self, config):
+        """
+        Extract unique feature categories from the configuration.
+
+        This method iterates over the list of input features in the configuration
+        dictionary and collects all unique feature categories based on their "type".
+        Using a set ensures that no duplicate categories are returned.
+
+        Parameters
+        ----------
+        config : dict
+            The configuration dictionary containing input feature definitions
+            under the key "inputs" → "features".
+
+        Returns
+        -------
+        list
+            A list of unique feature category names found in the configuration.
+
+        Examples
+        --------
+        >>> config = {
+        ...     "inputs": {
+        ...         "features": [
+        ...             {"name": "temperature", "type": "sensor"},
+        ...             {"name": "pressure", "type": "sensor"},
+        ...             {"name": "batch_id", "type": "metadata"}
+        ...         ]
+        ...     }
+        ... }
+        >>> obj.get_feature_categories(config)
+        ['sensor', 'metadata']
+        """
         categories = set()
-        for feature in config["inputs"].get('features', []):
-            feature_name = feature['name']
-            for category, variables in self.variable_categories.items():
-                if feature_name in variables:
-                    categories.add(category)
+        for feature in config.get("inputs", {}).get("features", []):
+            feature_category = feature.get("type")
+            if feature_category:
+                categories.add(feature_category)
         return list(categories)
-    
+
     def get_names_by_category(self, category, model_name):
         for config in self.configurations:
             try:
@@ -260,13 +210,11 @@ class ModelInformation:
                     # Navigate through the configuration structure to find the model
                     model_config = config.get('model_description', {})
                     if model_config.get('model_name') == model_name:
-                        # Get list name in  variable_categories by category selected
-                        valid_names = self.variable_categories.get(category, [])
-                        print("valid_names: ",valid_names)
+                        # Get list features for model selected
                         filtered_inputs = [
-                            {"label": feature['name'], "value": feature['name']}
-                            for feature in config["inputs"].get('features', [])
-                            if feature["type"] in category
+                                {"label": feature['name'], "value": feature['name']}
+                        for feature in config["inputs"].get('features', [])
+                        if feature["type"] in category
                         ]
                         return filtered_inputs
                 else:
@@ -277,9 +225,27 @@ class ModelInformation:
 
     
     def project_details(self):
-        """Get projetc details information"""
+        """
+        Retrieve detailed information about a specific project.
+
+        This method sends a GET request to the API endpoint `"{self.base_project_id}/project_info/"`
+        using the provided project identifier. It returns the project details
+        if the request is successful, otherwise logs an error message.
+
+        Returns
+        -------
+        dict or None
+            The project details as a dictionary if the request is successful.
+            Returns None if an error occurs during the API request.
+
+        Raises
+        ------
+        Exception
+            If an unexpected error occurs during the API request.
+        """
         try:
-            response = self.api_client.get("project_info/")
+            response = self.api_client.get(f"{self.base_project_id}/project_info/")
             return response
         except Exception as e:
-            print(f" Error get project details data: {e}")
+            logger.error(f"Error getting project details data: {e}")
+            return None
