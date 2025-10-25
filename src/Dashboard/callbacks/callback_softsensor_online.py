@@ -5,7 +5,7 @@ import plotly.graph_objs as go
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 from Dashboard.utils.utils_sofsensors_offline import reload_models
-from Dashboard.utils.utils_softsensors_online import (create_toast, generate_predictions,generate_prediction_name,build_figure_with_traces,
+from Dashboard.utils.utils_softsensors_online import (create_toast, generate_predictions,generate_prediction_name,build_figure_with_traces,update_xaxis_range,
                                                     get_latest_index,build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels)
 from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
@@ -157,13 +157,14 @@ def display_model_details(selected_model):
             Input('model-data-store', 'data'),
             Input("store-selected-state", "data"),
             Input(component_id='interval-component', component_property='n_intervals'),
+            Input('line-chart-prediction-on', 'relayoutData'),
             State('prediction-data','data'),
             State("selected-variables",'data'),
             State("store-inicio-pred", "data"),
             Input(component_id='run-on', component_property='n_clicks'),
             prevent_initial_call='initial_duplicate'
         )
-def update_graph(data_model, store_data, n,data_prediction, selected_variables,inicio_pred,n_clicks):
+def update_graph(data_model, store_data, n, relayout_data, data_prediction, selected_variables,inicio_pred,n_clicks):
             
             # ⛔ Espera a que el botón se presione al menos una vez
             if n_clicks == 0 or store_data is None or "selected_experiment" not in store_data:
@@ -196,6 +197,8 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,i
             if inicio_pred >= len(dfc):
                 print(f"⏳ No ha llegado un nuevo dato aún (inicio_pred={inicio_pred}, total={len(dfc)}).")
                 fig = build_figure_from_data(data_prediction,selected_variables, name_prediction)
+                # Keep range before if exist
+                fig = update_xaxis_range(fig,relayout_data,data_prediction)
                 return fig, data_prediction, inicio_pred,dash.no_update
 
             if inicio_pred < len(dfc):
@@ -212,6 +215,8 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,i
                     #🔁 Reutilizar datos anteriores y seguir mostrando el gráfico
                     fig = build_figure_from_data(data_prediction,selected_variables, name_prediction)
                     inicio_pred += 1
+                    # Keep range before if exist
+                    fig = update_xaxis_range(fig,relayout_data,data_prediction)
                     return fig, data_prediction, inicio_pred,dash.no_update
                 
                 if predicted_values is not None and not predicted_values.empty:
@@ -224,6 +229,9 @@ def update_graph(data_model, store_data, n,data_prediction, selected_variables,i
 
                     
                 inicio_pred += 1
+            
+            # Keep range before if exist
+            fig = update_xaxis_range(fig,relayout_data,data_prediction)
 
             return fig, data_prediction,inicio_pred,dash.no_update
 

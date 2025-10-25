@@ -1,5 +1,6 @@
 from dash import html,dcc, dash_table
 import dash_bootstrap_components as dbc
+from datetime import date
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_global import disabled_figure
 
@@ -100,14 +101,17 @@ def data_source_layout():
 
                     # Data by experiment
                     html.H5("Valid Data Points Over Time"),
-                    dbc.Label("Interval value"),
-                    dbc.Input(id="interval-value", type="number", value=10, min=1, step=1),
-                    dcc.Dropdown(
-                        id='time-unit-interval',
-                        options=[{"label": unit.capitalize(), "value": unit} for unit in time_units],
-                        value="minutes",
-                        clearable=False,
+                    dbc.Label("Range selection"),
+                    html.Br(),
+                    dcc.DatePickerRange(
+                        id='ds-date-picker-range',
+                        min_date_allowed=date(1995, 8, 5),
+                        max_date_allowed=date.today(),
+                        initial_visible_month=date.today(),
+                        start_date=date.today().replace(day=1),
+                        end_date=date.today()   
                     ),
+                    html.Div(id='output-container-date-picker-range'),
                     dbc.Label("Field(s) to count"),
                     dcc.Dropdown(
                         id="field-selector",

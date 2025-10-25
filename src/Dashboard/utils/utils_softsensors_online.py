@@ -32,7 +32,7 @@ def generate_predictions(batch_id, n=None):
 
     # Aplicar pequeñas variaciones aleatorias a columnas numéricas
     for col in dfc.select_dtypes(include=[np.number]).columns:
-        new_row[col] = new_row[col] + np.random.normal(0, 0.01 * new_row[col])
+        new_row[col] = new_row[col] + np.random.normal(0, 0.001 * new_row[col])
 
     # Columnas de predicción
     pred_cols = [
@@ -45,7 +45,7 @@ def generate_predictions(batch_id, n=None):
     for col in pred_cols:
         if col in new_row:
             # Generar valor aleatorio positivo similar a la concentración
-            new_row[col] = np.random.uniform(0, 50)
+            new_row[col] = np.random.uniform(0, 20)
 
     # Actualizar timestamp al momento actual si existe columna '_time'
     if '_time' in new_row:
@@ -183,38 +183,54 @@ def append_prediction(data_prediction, predicted_values, name_prediction, select
     Keep alignment across variables and prediction.
     Show toast if a variable is missing in predicted_values.
     """
-    tiempo_pred = pd.to_datetime(predicted_values['_time'])
-    nivel_pred = predicted_values.get(name_prediction, None)
+    # --- Asegurar que predicted_values sea un diccionario simple ---
+    if isinstance(predicted_values, pd.DataFrame):
+        predicted_values = predicted_values.iloc[0].to_dict()
+    elif isinstance(predicted_values, pd.Series):
+        predicted_values = predicted_values.to_dict()
+
+    # Obtener tiempo y valor de predicción
+    tiempo_pred = pd.to_datetime(predicted_values.get('_time'))
+    nivel_pred = predicted_values.get(name_prediction)
 
     logger.info(f"Updating prediction: {tiempo_pred}, {nivel_pred}")
 
-    # ⏱️ Agregar timestamp
-    data_prediction["_time"].append(tiempo_pred.strftime("%Y-%m-%d %H:%M:%S"))
+    # Si no hay tiempo, abortar (evita índices rotos)
+    if tiempo_pred is None:
+        logger.warning("Predicted value has no '_time' field, skipping append.")
+        return data_prediction
+
+    # --- Asegurar estructura de data_prediction ---
+    if "_time" not in data_prediction:
+        data_prediction["_time"] = []
+    data_prediction["_time"].append(tiempo_pred)
 
     # 🔮 Agregar valor de predicción
     if name_prediction not in data_prediction:
         data_prediction[name_prediction] = []
-    data_prediction[name_prediction].append(nivel_pred)
+    data_prediction[name_prediction].append(
+        nivel_pred if not pd.isna(nivel_pred) else None
+    )
 
-    # 📊 Variables seleccionadas
+    # 📊 Agregar las variables seleccionadas
     for variable in selected_variables:
         var_name = variable["variable_name"]
         if var_name == name_prediction:
             continue
 
-        value_variable = predicted_values.get(var_name)
+        # Obtener valor de la variable
+        value_variable = predicted_values.get(var_name, None)
 
-        if value_variable is None:
-            # 🚨 Si no existe, lanzar toast y mantener alineación
-            if var_name not in data_prediction:
-                data_prediction[var_name] = []
+        # Inicializar si no existe
+        if var_name not in data_prediction:
+            data_prediction[var_name] = []
+
+        # Si falta el valor, mostrar advertencia y mantener alineación
+        if value_variable is None or pd.isna(value_variable):
             data_prediction[var_name].append(None)
-            create_toast(f"Warning: The variable '{var_name}' is not part of the model.")
+            logger.warning(f"⚠️ Variable '{var_name}' missing in prediction row.")
         else:
-            if var_name not in data_prediction:
-                data_prediction[var_name] = []
-            # Guardar valor o None si es NaN → mantiene sincronía
-            data_prediction[var_name].append(value_variable if not pd.isna(value_variable) else None)
+            data_prediction[var_name].append(value_variable)
 
     return data_prediction
 
@@ -325,3 +341,52 @@ def build_figure_with_traces(data_prediction, selected_variables, name_predictio
 
     return fig
 
+def update_xaxis_range(fig, relayout_data, data_prediction):
+    """
+    Update x-axis range dynamically:
+    - Keep user zoom if new data is within range.
+    - Auto-scroll if new data arrives outside the current range.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objs.Figure
+        The figure to update.
+    relayout_data : dict or None
+        Data from Plotly's relayoutData event (contains zoom/pan range).
+    data_prediction : pandas.DataFrame or dict
+        Object containing "_time" values (can be list or Series).
+
+    Returns
+    -------
+    fig : plotly.graph_objs.Figure
+        Updated figure.
+    """
+    import pandas as pd
+
+    # 🔹 Obtener último tiempo de data_prediction
+    if "_time" not in data_prediction or len(data_prediction["_time"]) == 0:
+        fig.update_xaxes(autorange=True)
+        return fig
+
+    time_values = data_prediction["_time"]
+    latest_time = pd.to_datetime(time_values[-1] if isinstance(time_values, list) else time_values.iloc[-1])
+
+    # 🔹 Si hay un rango actual del usuario (zoom/pan)
+    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
+        start_range = pd.to_datetime(relayout_data['xaxis.range[0]'])
+        end_range = pd.to_datetime(relayout_data['xaxis.range[1]'])
+        delta = end_range - start_range
+
+        # Si el nuevo punto está fuera del rango → mover la ventana
+        if latest_time > end_range:
+            new_start = latest_time - delta
+            new_end = latest_time
+            fig.update_xaxes(range=[new_start, new_end])
+        else:
+            # Mantener zoom actual
+            fig.update_xaxes(range=[start_range, end_range])
+    else:
+        # 🔹 Si no hay zoom previo, usar autoescala (modo seguimiento automático)
+        fig.update_xaxes(autorange=True)
+
+    return fig

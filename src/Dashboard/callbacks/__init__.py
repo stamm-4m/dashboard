@@ -1,2 +1,2 @@
-from Dashboard.callbacks import (callback_sidebar, callback_data_source,callback_softsensor_offline,
+from Dashboard.callbacks import (callback_sidebar, callback_data_source,callback_softsensor_offline,callback_help,
                        callback_softsensor_online,callback_model_upload,callback_performance_estimator,callback_maintenance, callback_auth,callback_data_drift)

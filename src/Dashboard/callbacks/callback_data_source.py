@@ -11,6 +11,7 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import logging
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +183,7 @@ def display_project_details(value):
         }
         return generate_projects_details_view(data), name
     else:
-        return html.P("The information project not found."), name
+        return html.P("Information regarding this project is not found"), name
 
 @dash.callback(
     Output("table-experiments-online", "data"),
@@ -237,62 +238,64 @@ def update_online_experiments(n_intervals, selected_unit, selected_value):
 
 @dash.callback(
     Output("line-experiments", "figure"),
-    Input("interval-value", "value"),
-    Input("time-unit-interval", "value"),
+    Input('ds-date-picker-range', 'start_date'),
+    Input('ds-date-picker-range', 'end_date'),
     Input("field-selector", "value"),
 )
-def update_timeseries_data_count(interval_value, interval_unit,selected_field):
-    """
-    Updates the time series chart showing valid data point counts per interval.
-    """
-    print("selected_field: ", selected_field)
+def update_timeseries_data_count(start_date, end_date, selected_field):
+    """Updates the time series chart showing valid data point counts per interval."""
+    print("selected_field:", selected_field)
     try:
-        if not interval_value or not interval_unit or not selected_field:
+        if not start_date or not end_date or not selected_field:
             return go.Figure()
 
-        # Obtener los datos desde Influx 
-        df = influxdb_handler.get_recent_data_for_graph()  
-
+        df = influxdb_handler.get_recent_data_for_graph()
         if df.empty or "_time" not in df.columns:
             return go.Figure()
 
         df["_time"] = pd.to_datetime(df["_time"])
-        
+        mask = (df["_time"] >= start_date) & (df["_time"] <= end_date)
+        df = df.loc[mask]
+        if df.empty:
+            return go.Figure()
+
+        start, end = pd.to_datetime(start_date), pd.to_datetime(end_date)
+        diff_days = (end - start).days
+
+        # Seleccionar frecuencia automática
+        if diff_days <= 1:
+            freq = "H"
+        elif diff_days <= 7:
+            freq = "3H"
+        elif diff_days <= 30:
+            freq = "D"
+        elif diff_days <= 180:
+            freq = "W"
+        else:
+            freq = "M"
+
+        print(f"Resample frequency: {freq}, Range: {diff_days} days")
+
         results = []
-
-        unit_map = {
-            "seconds": "S",
-            "minutes": "min", 
-            "hours": "h",
-            "days": "D",
-            "months": "MS"  
-        }
-        
-        interval_str = f"{interval_value}{unit_map[interval_unit]}"
-
-        print("interval_str: ",interval_str)
 
         for exp_id in df["_measurement"].unique():
             df_exp = df[df["_measurement"] == exp_id].copy()
             df_exp.set_index("_time", inplace=True)
+            df_exp = df_exp.sort_index()
 
-            counts = df_exp.resample(interval_str).count()
-            counts["Experiment ID"] = exp_id
-            counts = counts.reset_index()
-
+            # Contar registros por frecuencia
             if selected_field == "all":
-                data_count = counts.drop(columns=["_time", "Experiment ID"], errors="ignore").sum(axis=1)
+                data_count = df_exp.resample(freq).count().sum(axis=1)
             else:
-                if selected_field not in counts.columns:
-                    continue  # Si la columna no existe, omitir
-                data_count = counts[selected_field]
+                if selected_field not in df_exp.columns:
+                    continue
+                data_count = df_exp[selected_field].resample(freq).count()
 
             partial_df = pd.DataFrame({
-                "_time": counts["_time"],
+                "_time": data_count.index,
                 "Experiment ID": exp_id,
-                "Data Count": data_count
+                "Data Count": data_count.values
             })
-
             results.append(partial_df)
 
         if not results:
@@ -300,34 +303,27 @@ def update_timeseries_data_count(interval_value, interval_unit,selected_field):
 
         final_df = pd.concat(results, ignore_index=True)
 
-        fig = px.histogram(
+        fig = px.bar(
             final_df,
             x="_time",
             y="Data Count",
             color="Experiment ID",
-            title=f"Data Count Every {interval_value} {interval_unit} ({selected_field})",
-            
+            title=f"Data Count {start_date} - {end_date} ({selected_field})"
         )
 
-        unit_to_ms = {
-            "seconds": 1000,
-            "minutes": 60 * 1000,
-            "hours": 3600 * 1000,
-            "days": 24 * 3600 * 1000,
-            "months": 30 * 24 * 3600 * 1000,
-        }
-
-        bin_size = interval_value * unit_to_ms.get(interval_unit, 60 * 1000)  # default 1 min
-
-        fig.update_traces(xbins=dict(size=bin_size))
-
-        fig.update_layout(margin={"l": 20, "r": 20, "t": 50, "b": 20})
+        fig.update_layout(
+            barmode="group",
+            margin={"l": 20, "r": 20, "t": 50, "b": 20},
+            xaxis_title="Time",
+            yaxis_title="Data count"
+        )
 
         return fig
 
     except Exception as e:
         print(f"[ERROR] update_timeseries_data_count: {e}")
         return go.Figure()
+
 
 @dash.callback(
     Output("field-selector", "options"),
@@ -354,4 +350,24 @@ def load_field_options(n_intervals):
     except Exception as e:
         print(f"[ERROR] load_field_options: {e}")
         return [{"label": "All fields", "value": "all"}]
+
+@dash.callback(
+    Output('output-container-date-picker-range', 'children'),
+    Input('ds-date-picker-range', 'start_date'),
+    Input('ds-date-picker-range', 'end_date'))
+def update_output(start_date, end_date):
+    string_prefix = 'You have selected: '
+    if start_date is not None:
+        start_date_object = date.fromisoformat(start_date)
+        start_date_string = start_date_object.strftime('%B %d, %Y')
+        string_prefix = string_prefix + 'Start Date: ' + start_date_string + ' | '
+    if end_date is not None:
+        end_date_object = date.fromisoformat(end_date)
+        end_date_string = end_date_object.strftime('%B %d, %Y')
+        string_prefix = string_prefix + 'End Date: ' + end_date_string
+    if len(string_prefix) == len('You have selected: '):
+        return 'Select a date to see it displayed here'
+    else:
+        return string_prefix
+
 
