@@ -213,7 +213,7 @@ def update_graph_var_maintenance(data,data_exp,range_slider, n_clicks, selected_
         print("No experiment ID Selected")
         return go.Figure(), [],[],[]
     
-    dfc = influxdb_handler.get_data_by_batch_id2(data_exp["selected_experiment"])
+    dfc = influxdb_handler.get_data_by_batch_id(data_exp["selected_experiment"])
     print("dfc: ",dfc)
     dfc["_time"] = pd.to_datetime(dfc["_time"], errors="coerce")
 
@@ -391,7 +391,7 @@ def update_slider_labels(data,slider_range, figure):
         print("No experiment ID Selected")
         return "", 0
 
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
+    dfc = influxdb_handler.get_data_by_batch_id(data['selected_experiment'])
     start_idx, end_idx = slider_range
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())

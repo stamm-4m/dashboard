@@ -1,5 +1,4 @@
 from Dashboard.InfluxDb.InfluxDBServices import InfluxDBServices
 
-# Instancia única de la conexión a InfluxDB
-
+# Insttance unique from InfluxDB connection
 influxdb_handler = InfluxDBServices()

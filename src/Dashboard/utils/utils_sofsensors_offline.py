@@ -12,7 +12,7 @@ def reload_models():
     model_information.load_all_models()
 
 def generate_predictions(batch_id, datamodel, n):
-    dfc = influxdb_handler.get_data_by_batch_id2(batch_id)
+    dfc = influxdb_handler.get_data_by_batch_id(batch_id)
 
     dfc = dfc.dropna()
 

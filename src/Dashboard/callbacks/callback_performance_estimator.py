@@ -171,7 +171,7 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     base_pred_name = generate_prediction_name(model_data_selected["model_file"])   # base model
 
     # Data del experimento
-    df_bach = influxdb_handler.get_data_by_batch_id2(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_by_batch_id(experiment_id["selected_experiment"])
 
     if "_time" not in df_bach.columns:
         print("⚠️ _time column missing in data")
@@ -317,7 +317,7 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
     print("triggered_id : ",triggered_id)
 
     # ✅ Obtener datos
-    df_bach = influxdb_handler.get_data_by_batch_id2(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_by_batch_id(experiment_id["selected_experiment"])
     if "_time" not in df_bach.columns:
         return dash.no_update, dash.no_update, dash.no_update
 
@@ -440,7 +440,7 @@ def update_window_size_slider_labels(data, slider_range):
         return "", 0
     
     # Consulta últimos datos online (últimos 5 min)
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'], 5)
+    dfc = influxdb_handler.get_data_by_batch_id(data['selected_experiment'], 5)
 
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
@@ -463,7 +463,7 @@ def update_window_size_slider_labels(data, slider_range):
                 ], n_total
 
     # Si no hay datos online, se consulta batch completo
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
+    dfc = influxdb_handler.get_data_by_batch_id(data['selected_experiment'])
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
         n_total = len(timestamps)

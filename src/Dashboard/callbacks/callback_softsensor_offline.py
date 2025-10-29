@@ -319,7 +319,7 @@ def update_graph(data_model, store_data, n, data_prediction, selected_variables)
             if store_data is None or 'selected_experiment' not in store_data:
                 return (disabled_figure, None)  
             # Get the data for the selected batch
-            dfc = influxdb_handler.get_data_by_batch_id2(store_data['selected_experiment'])
+            dfc = influxdb_handler.get_data_by_batch_id(store_data['selected_experiment'])
             inicio_pred += 1  # Reset the prediction counter
             txt_prediction = generate_prediction_name("default_model.pkl")
            

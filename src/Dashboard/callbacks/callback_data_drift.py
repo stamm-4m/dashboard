@@ -243,7 +243,7 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
             template="plotly_white"
         )
 
-    dfo = influxdb_handler.get_data_by_batch_id2(experiment_id,5)
+    dfo = influxdb_handler.get_data_by_batch_id(experiment_id,5)
     str_mode = False
     if not dfo.empty:
         str_mode = True
@@ -355,7 +355,7 @@ def update_size_slider_labels(data, slider_range):
         return "", 0
     
     # Consulta últimos datos online (últimos 5 min)
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'], 5)
+    dfc = influxdb_handler.get_data_by_batch_id(data['selected_experiment'], 5)
 
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
@@ -379,7 +379,7 @@ def update_size_slider_labels(data, slider_range):
         ], n_total
 
     # Si no hay datos online, se consulta batch completo
-    dfc = influxdb_handler.get_data_by_batch_id2(data['selected_experiment'])
+    dfc = influxdb_handler.get_data_by_batch_id(data['selected_experiment'])
     if not dfc.empty:
         timestamps = sorted(dfc["_time"].dropna().unique())
         n_total = len(timestamps)

@@ -1,4 +1,6 @@
-from Dashboard.config import INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,BACH_ID
+from Dashboard.config import  ( INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,INFLUXDB_BATCH_ID,
+                               INFLUXDB_BUCKET_METADATA,INFLUXDB_BUCKET_PREDICTIONS,INFLUXDB_BUCKET_RAW,INFLUXDB_MEASUREMENT)
+                            
 from Dashboard.db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
 from influxdb_client import Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -12,102 +14,90 @@ connector = InfluxDBConnector(
     url=INFLUXDB_URL,
     token=INFLUXDB_TOKEN,
     org=INFLUXDB_ORG,
-    bucket=INFLUXDB_BUCKET
 )
 
 class InfluxDBServices:
     def __init__(self):
         self.connector = connector
+        self.buckets = {
+            "RAW": INFLUXDB_BUCKET_RAW,
+            "PREDICTIONS": INFLUXDB_BUCKET_PREDICTIONS,
+            "METADATA": INFLUXDB_BUCKET_METADATA,
+        }
         self.unit_mapping = {
-                "time": "Hour", "aeration_rate": "Fg:L/h", "agitator": "RPM",
-                "sugar_feed_rate": "L/h", "acid_flow_rate": "L/h", "base_flow_rate": "L/h",
-                "heating/cooling_water_flow_rate": "L/h", "heating_water_flow_rate": "L/h",
-                "water_for_injection/dilution": "L/h", "air_head_pressure": "bar",
-                "dumped_broth_flow": "L/h", "substrate_concentration": "g/L",
-                "dissolved_oxygen_concentration": "mg/L", "penicillin_concentration": "g/L",
-                "vessel_volume": "L", "vessel_weight": "Kg", "pH": "pH",
-                "temperature": "Kelvin", "generated_heat": "kJ", "CO2_percent_in_off_gas": "%",
-                "PAA_flow": "L/h", "PAA_concentration": "g L^{-1}", "oil_flow": "L/h",
-                "NH3_concentration": "g L^{-1}", "oxygen_uptake_rate": "g min^{-1}",
-                "oxygen_in_percent_in_off_gas": "%", "offline_penicillin_concentration": "g L^{-1}",
-                "offline_biomass_concentration": "g L^{-1}", "carbon_evolution_rate": "g/h",
-                "ammonia_shots": "kgs", "viscosity": "centPoise"
+                "time": "Hour",
+                "aeration_rate": "Fg:L/h",
+                "agitator": "RPM",
+                "sugar_feed_rate": "L/h",
+                "acid_flow_rate": "L/h",
+                "base_flow_rate": "L/h",
+                "heating/cooling_water_flow_rate": "L/h",
+                "heating_water_flow_rate": "L/h",
+                "water_for_injection/dilution": "L/h",
+                "air_head_pressure": "bar",
+                "dumped_broth_flow": "L/h",
+                "substrate_concentration": "g/L",
+                "dissolved_oxygen_concentration": "mg/L",
+                "penicillin_concentration": "g/L",
+                "vessel_volume": "L",
+                "vessel_weight": "Kg",
+                "pH": "pH",
+                "temperature": "Kelvin",
+                "generated_heat": "kJ",
+                "CO2_percent_in_off_gas": "%",
+                "PAA_flow": "L/h",
+                "PAA_concentration": "g L^{-1}",
+                "oil_flow": "L/h",
+                "NH3_concentration": "g L^{-1}",
+                "oxygen_uptake_rate": "g min^{-1}",
+                "oxygen_in_percent_in_off_gas": "%",
+                "offline_penicillin_concentration": "g L^{-1}",
+                "offline_biomass_concentration": "g L^{-1}",
+                "carbon_evolution_rate": "g/h",
+                "ammonia_shots": "kgs",
+                "viscosity": "centPoise"
             }
-    
-    def get_buckets(self):
+        
+    def get_all_observed_properties(self):
         """
-        Retrieves a list of buckets available in InfluxDB.
+        Retrieves all observed properties and their metadata (unit, display_name, decimals)
+        from the InfluxDB metadata bucket.
 
         Returns:
-            list: A list of bucket names.
+            dict: Mapping of observed_property -> {"unit": str, "display_name": str, "decimals": int}
         """
         try:
-            buckets_api = self.connector.client.buckets_api()
-            buckets = buckets_api.find_buckets().buckets
-            return [bucket.name for bucket in buckets if bucket is not None]
-        except Exception as e:
-            print(f"Error fetching buckets: {e}")
-            return []
-  
-    def fetch_buckets_and_projects(self):
-        """
-        Retrieves buckets and their associated projects from InfluxDB.
+            query = f"""
+            from(bucket: "{self.buckets['METADATA']}")
+            |> range(start: 0)
+            |> filter(fn: (r) => r["_measurement"] == "{str(INFLUXDB_MEASUREMENT)}")
+            |> filter(fn: (r) => r["_field"] == "decimals" or r["_field"] == "display_name" or r["_field"] == "unit")
+            |> last()
+            |> group(columns: ["observed_property", "_field"])
+            |> pivot(rowKey:["observed_property"], columnKey: ["_field"], valueColumn: "_value")
+            """
 
-        Returns:
-            dict: A dictionary where keys are bucket names and values are lists of measurements.
-        """
-        try:
-            buckets = self.get_buckets()
-            data = {}
-            for bucket in buckets:
-                query = f'''
-                import "influxdata/influxdb/schema"
-                schema.measurements(bucket: "{bucket}")
-                '''
-                tables = self.connector.query_api.query(org=INFLUXDB_ORG, query=query)
-                data[bucket] = [record.get_value() for table in tables for record in table.records]
-            return data
+            result = self.connector.query_api.query(org=self.connector.org, query=query)
+
+            observed_props = {}
+            for table in result:
+                for record in table.records:
+                    obs = record.values.get("observed_property")
+                    unit = record.values.get("unit")
+                    display_name = record.values.get("display_name")
+                    decimals = record.values.get("decimals")
+                    observed_props[obs] = {
+                        "unit": unit,
+                        "display_name": display_name,
+                        "decimals": decimals
+                    }
+
+            return observed_props
+
         except Exception as e:
-            print(f"Error fetching buckets and projects: {e}")
+            print(f"Error retrieving observed properties: {e}")
             return {}
 
-    def read_data_from_influx(self, bucket, measurement, fields, start_time="-1h", stop_time="now"):
-        """
-        Reads data from InfluxDB and returns it as a Pandas DataFrame.
-
-        Args:
-            bucket (str): Bucket to query from.
-            measurement (str): Measurement name.
-            fields (list): List of field names.
-            start_time (str): Query start time.
-            stop_time (str): Query stop time.
-
-        Returns:
-            pd.DataFrame: DataFrame containing the query results.
-        """
-        try:
-            fields_filter = " or ".join([f'r["_field"] == "{field}"' for field in fields])
-            query = f'''
-            from(bucket: "{bucket}")
-            |> range(start: {start_time}, stop: {stop_time})
-            |> filter(fn: (r) => r["_measurement"] == "{measurement}")
-            |> filter(fn: (r) => {fields_filter})
-            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-            '''
-            result = self.connector.query_api.query_data_frame(query=query, org=INFLUXDB_ORG)
-
-            if isinstance(result, list):
-                return pd.concat(result, ignore_index=True)
-            elif isinstance(result, pd.DataFrame):
-                return result
-            else:
-                print("No data returned from InfluxDB.")
-                return pd.DataFrame()
-        except Exception as e:
-            print(f"Error reading data from InfluxDB: {e}")
-            return pd.DataFrame()
-        
-    
     def get_experiment_ids_from_bucket(self):
         """
         Retrieves a unique list of experiment_ID from the specified bucket in InfluxDB.
@@ -126,12 +116,12 @@ class InfluxDBServices:
             
                 # Query to retrieve unique experiment_ID
                 query = f"""
-                from(bucket: "{self.connector.bucket}")
+                from(bucket: "{self.buckets["RAW"]}")
                 |> range(start: 0)
-                |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Asegura que experiment_ID existe
-                |> keep(columns: ["{str(BACH_ID)}"])
-                |> distinct(column: "{str(BACH_ID)}")
-                |> sort(columns: ["{str(BACH_ID)}"], desc: false)
+                |> filter(fn: (r) => exists r["{str(INFLUXDB_BATCH_ID)}"])  // Asegura que experiment_ID existe
+                |> keep(columns: ["{str(INFLUXDB_BATCH_ID)}"])
+                |> distinct(column: "{str(INFLUXDB_BATCH_ID)}")
+                |> sort(columns: ["{str(INFLUXDB_BATCH_ID)}"], desc: false)
                 """
                 
                 # Execute the query
@@ -149,7 +139,7 @@ class InfluxDBServices:
             print(f"Error retrieving experiment_ID: {e}")
             return []
   
-    def get_data_by_batch_id2(self, batch_id, minutes: int = 0):
+    def get_data_by_batch_id(self, batch_id, minutes: int = 0):
         """
         Returns a DataFrame with all fields and values associated with a given batch_id.
 
@@ -173,7 +163,7 @@ class InfluxDBServices:
                 start_flux = f"-{minutes}m"
             # Build the Flux query
             query = f"""
-            from(bucket: "{str(INFLUXDB_BUCKET)}")
+            from(bucket: "{str(self.buckets["RAW"])}")
             |> range(start: {str(start_flux)})  // Adjust the time range as needed
             |> filter(fn: (r) => r["_measurement"] == "{str(batch_id)}")
             """
