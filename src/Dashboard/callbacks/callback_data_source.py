@@ -1,5 +1,5 @@
 import dash
-from dash import Input, Output, State, dcc, html, dash_table, MATCH
+from dash import Input, Output, State, html
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
@@ -9,12 +9,9 @@ from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
 import pandas as pd
-import numpy as np
 import logging
 import humanize
 from datetime import date, datetime, timezone
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +102,6 @@ def update_table_data(experiment_id):
     """
     if not experiment_id:
         raise PreventUpdate
-
     try:
         raw_data = influxdb_handler.get_data_for_table(experiment_id)
         
@@ -195,8 +191,8 @@ def display_project_details(value):
         - str : A string representing the project name header.
     """
     data_info = model_information.project_details()
-    name = f"Project name: {NAME_PROJECT}"
     if data_info:
+        name = f"Project name: {data_info.get('name',{})}"
         data = {
             "description": data_info.get('description', {})
         }
@@ -228,7 +224,6 @@ def update_online_experiments(n_intervals, selected_unit, selected_value):
         )
 
         if not summary:
-            logger.debug("not summary")
             return dash.no_update, "No recent data found for the selected time range.", "info", True
 
         # Si hay datos, los mostramos y ocultamos el mensaje
@@ -344,6 +339,16 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
     prevent_initial_call=True
 )
 def load_field_options(interval, current_options):
+    """
+    Updates the field selector options based on recent data from InfluxDB.
+
+    Args:
+        interval (int): The number of intervals passed since the app started.
+        current_options (list): The current options available in the field selector.
+
+    Returns:
+        list: Updated list of field options for the dropdown.
+    """
     try:
         df = influxdb_handler.get_recent_data_for_graph()
         if df.empty:
@@ -355,7 +360,7 @@ def load_field_options(interval, current_options):
         new_options = [{"label": "All fields", "value": "all"}]
         new_options += [{"label": field.capitalize(), "value": field} for field in valid_fields]
 
-        # ✅ Evita refrescos si no hay cambios reales
+        # ✅ Prevents refresh if there are no real changes
         if new_options == current_options:
             return dash.no_update
 
@@ -370,8 +375,19 @@ def load_field_options(interval, current_options):
 @dash.callback(
     Output('output-container-date-picker-range', 'children'),
     Input('ds-date-picker-range', 'start_date'),
-    Input('ds-date-picker-range', 'end_date'))
+    Input('ds-date-picker-range', 'end_date')
+)
 def update_output(start_date, end_date):
+    """
+    Updates the displayed text based on the selected date range.
+
+    Args:
+        start_date (str): Start date in ISO format (YYYY-MM-DD).
+        end_date (str): End date in ISO format (YYYY-MM-DD).
+
+    Returns:
+        str: Text describing the selected date range.
+    """
     string_prefix = 'You have selected: '
     if start_date is not None:
         start_date_object = date.fromisoformat(start_date)
@@ -385,5 +401,4 @@ def update_output(start_date, end_date):
         return 'Select a date to see it displayed here'
     else:
         return string_prefix
-
 
