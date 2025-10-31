@@ -1,6 +1,6 @@
 from dash import html,dcc, dash_table
 import dash_bootstrap_components as dbc
-from datetime import date
+from datetime import date, timedelta
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_global import disabled_figure
 
@@ -106,7 +106,7 @@ def data_source_layout():
                     dcc.DatePickerRange(
                         id='ds-date-picker-range',
                         min_date_allowed=date(1995, 8, 5),
-                        max_date_allowed=date.today(),
+                        max_date_allowed=date.today() + timedelta(days=1),
                         initial_visible_month=date.today(),
                         start_date=date.today().replace(day=1),
                         end_date=date.today()   

@@ -6,57 +6,33 @@ from influxdb_client import Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime, timedelta
 
-
 import pandas as pd
 import logging
 
-connector = InfluxDBConnector(
-    url=INFLUXDB_URL,
-    token=INFLUXDB_TOKEN,
-    org=INFLUXDB_ORG,
-)
+logger = logging.getLogger(__name__)
+
+config = {
+    "url":INFLUXDB_URL,
+    "token":INFLUXDB_TOKEN,
+    "org":INFLUXDB_ORG,
+}
 
 class InfluxDBServices:
     def __init__(self):
-        self.connector = connector
+        self.connector = InfluxDBConnector(config)
         self.buckets = {
             "RAW": INFLUXDB_BUCKET_RAW,
             "PREDICTIONS": INFLUXDB_BUCKET_PREDICTIONS,
             "METADATA": INFLUXDB_BUCKET_METADATA,
         }
+        self.observed_properties = self.get_all_observed_properties()
+
+        # Crear el mapping de unidades, por ejemplo:
         self.unit_mapping = {
-                "time": "Hour",
-                "aeration_rate": "Fg:L/h",
-                "agitator": "RPM",
-                "sugar_feed_rate": "L/h",
-                "acid_flow_rate": "L/h",
-                "base_flow_rate": "L/h",
-                "heating/cooling_water_flow_rate": "L/h",
-                "heating_water_flow_rate": "L/h",
-                "water_for_injection/dilution": "L/h",
-                "air_head_pressure": "bar",
-                "dumped_broth_flow": "L/h",
-                "substrate_concentration": "g/L",
-                "dissolved_oxygen_concentration": "mg/L",
-                "penicillin_concentration": "g/L",
-                "vessel_volume": "L",
-                "vessel_weight": "Kg",
-                "pH": "pH",
-                "temperature": "Kelvin",
-                "generated_heat": "kJ",
-                "CO2_percent_in_off_gas": "%",
-                "PAA_flow": "L/h",
-                "PAA_concentration": "g L^{-1}",
-                "oil_flow": "L/h",
-                "NH3_concentration": "g L^{-1}",
-                "oxygen_uptake_rate": "g min^{-1}",
-                "oxygen_in_percent_in_off_gas": "%",
-                "offline_penicillin_concentration": "g L^{-1}",
-                "offline_biomass_concentration": "g L^{-1}",
-                "carbon_evolution_rate": "g/h",
-                "ammonia_shots": "kgs",
-                "viscosity": "centPoise"
-            }
+            prop: meta["unit"]
+            for prop, meta in self.observed_properties.items()
+            if meta["unit"] is not None
+        }
         
     def get_all_observed_properties(self):
         """
@@ -77,7 +53,7 @@ class InfluxDBServices:
             |> pivot(rowKey:["observed_property"], columnKey: ["_field"], valueColumn: "_value")
             """
 
-            result = self.connector.query_api.query(org=self.connector.org, query=query)
+            result = self.connector.query_api.query(query)
 
             observed_props = {}
             for table in result:
@@ -95,7 +71,7 @@ class InfluxDBServices:
             return observed_props
 
         except Exception as e:
-            print(f"Error retrieving observed properties: {e}")
+            logger.error(f"Error retrieving observed properties: {e}")
             return {}
 
     def get_experiment_ids_from_bucket(self):
@@ -136,7 +112,7 @@ class InfluxDBServices:
                 return experiment_ids
 
         except Exception as e:
-            print(f"Error retrieving experiment_ID: {e}")
+            logger.error(f"Error retrieving experiment_ID: {e}")
             return []
   
     def get_data_by_batch_id(self, batch_id, minutes: int = 0):
@@ -201,7 +177,7 @@ class InfluxDBServices:
 
                 return df_pivot
             else:
-                print(f"No data found for batch_id {batch_id}.")
+                logger.info(f"No data found for batch_id {batch_id}.")
                 return pd.DataFrame()
 
         except ValueError as ve:
@@ -209,7 +185,7 @@ class InfluxDBServices:
             return pd.DataFrame()
 
         except Exception as e:
-            print(f"Error retrieving data for batch_id {batch_id}: {e}")
+            logger.error(f"Error retrieving data for batch_id {batch_id}: {e}")
             return pd.DataFrame()
     
     def get_data_until_latest(self, batch_id):
@@ -228,9 +204,9 @@ class InfluxDBServices:
 
             # Flux query to retrieve all data for the given batch_id
             query = f"""
-            from(bucket: "{str(INFLUXDB_BUCKET)}")
+            from(bucket: "{str(self.buckets['RAW'])}")
             |> range(start: 0)  // Get all data from the beginning of the bucket
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(batch_id)}")
+            |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(batch_id)}")
             """
             
             results = self.connector.query_api.query(query=query)
@@ -252,11 +228,11 @@ class InfluxDBServices:
                 df_pivot.reset_index(inplace=True)
                 return df_pivot
             else:
-                print(f"No data found for batch_id {batch_id}.")
+                logger.info(f"No data found for batch_id {batch_id}.")
                 return pd.DataFrame()
 
         except Exception as e:
-            print(f"Error retrieving data until latest for batch_id {batch_id}: {e}")
+            logger.error(f"Error retrieving data until latest for batch_id {batch_id}: {e}")
             return pd.DataFrame()
 
 
@@ -275,12 +251,12 @@ class InfluxDBServices:
         try:
             # Query to retrieve unique experiment_ID
             query = f"""
-            from(bucket: "{INFLUXDB_BUCKET}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: {time_range})
-            |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Asegura que experiment_ID existe
-            |> keep(columns: ["{str(BACH_ID)}"])
-            |> distinct(column: "{str(BACH_ID)}")
-            |> sort(columns: ["{str(BACH_ID)}"], desc: false)
+            |> filter(fn: (r) => exists r["{str(INFLUXDB_BATCH_ID)}"])
+            |> keep(columns: ["{str(INFLUXDB_BATCH_ID)}"])
+            |> distinct(column: "{str(INFLUXDB_BATCH_ID)}")
+            |> sort(columns: ["{str(INFLUXDB_BATCH_ID)}"], desc: false)
             """
             #print("query",query)
 
@@ -297,50 +273,10 @@ class InfluxDBServices:
             return experiment_ids
 
         except Exception as e:
-            print(f"Error retrieving experiment_ID from bucket '{INFLUXDB_BUCKET}': {e}")
+            logger.error(f"Error retrieving experiment_ID from bucket '{INFLUXDB_BUCKET_RAW}': {e}")
             return []
 
-    def get_category_counts(self, experiment_ID, time_range="0"):
-        """
-        Retrieves the count of sensors, actuators, soft sensors, and computed variables
-        for a specific experiment_ID.
-
-        Args:
-            experiment_ID (str): ID of the experiment to filter.
-            time_range (str): Time range for the query (default is "-90d").
-
-        Returns:
-            dict: A dictionary with the counts of each category.
-        """
-        try:
-
-            logging.info(f"Fetching category counts for experiment: {experiment_ID} in bucket: {INFLUXDB_BUCKET}")
-            
-            # Query to retrieve data counts by category
-            query = f"""
-            from(bucket: \"{INFLUXDB_BUCKET}\")
-            |> range(start: {time_range})
-            |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == \"{experiment_ID}\")
-            |> keep(columns: [\"type\", \"_field\"])
-            |> distinct(column: \"_field\")
-            |> count()
-            """
-
-            logging.debug(f"Executing Flux Query: {query}")
-
-            # Execute the query
-            result = self.connector.query_api.query(org=self.connector.org, query=query)
-
-            # Extract counts per category
-            category_counts = {"sensor": 8, "actuator": 11, "computed_variable": 2, "soft_sensor": 1, "offline_measurement": 5}
-            
-            logging.info(f"Final Category Counts: {category_counts}")
-            return category_counts
-
-        except Exception as e:
-            logging.error(f"Error retrieving category counts: {e}")
-            return {"sensor": 8, "actuator": 11, "computed_variable": 2, "soft_sensor": 1, "offline_measurement": 5}
-
+    
     def get_experiment_duration(self, experiment_ID, time_range="0"):
         """
         Fetch the duration of an experiment based on its ID.
@@ -355,9 +291,9 @@ class InfluxDBServices:
         try:
             # Query for earliest timestamp
             query_min_time = f"""
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: 0)
-            |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == "{experiment_ID}")
+            |> filter(fn: (r) => r[\"{str(INFLUXDB_BATCH_ID)}\"] == "{experiment_ID}")
             |> keep(columns: ["_time"])
             |> sort(columns: ["_time"], desc: false)
             |> limit(n: 1)
@@ -365,14 +301,13 @@ class InfluxDBServices:
 
             # Query for latest timestamp
             query_max_time = f"""
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: 0)
-            |> filter(fn: (r) => r[\"{str(BACH_ID)}\"] == "{experiment_ID}")
+            |> filter(fn: (r) => r[\"{str(INFLUXDB_BATCH_ID)}\"] == "{experiment_ID}")
             |> keep(columns: ["_time"])
             |> sort(columns: ["_time"], desc: true)
             |> limit(n: 1)
             """
-            #print(query_max_time)
             # Execute
             result_min_time = self.connector.query_api.query(org=self.connector.org, query=query_min_time)
             result_max_time = self.connector.query_api.query(org=self.connector.org, query=query_max_time)
@@ -386,7 +321,7 @@ class InfluxDBServices:
                 for record in table.records:
                     max_time = record.get_time()
 
-            print(f"[DEBUG] Min time: {min_time}, Max time: {max_time}")
+            logger.debug(f"Min time: {min_time}, Max time: {max_time}")
 
             if min_time and max_time:
                 duration_in_seconds = (max_time - min_time).total_seconds()
@@ -400,7 +335,7 @@ class InfluxDBServices:
             return 0.0
 
         except Exception as e:
-            print(f"[ERROR] get_experiment_duration: {e}")
+            logger.info(f"get_experiment_duration: {e}")
             return 0.0
 
     def get_data_for_table(self, experiment_ID, time_range="0"):
@@ -411,27 +346,29 @@ class InfluxDBServices:
         try:
             queries = {
                 "mean": f"""
-                from(bucket: "{INFLUXDB_BUCKET}")
+                from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
-                |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
-                |> keep(columns: ["type", "_field", "_value"])
-                |> group(columns: ["type", "_field"])
+                |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
+                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
                 |> mean()
                 """,
+
                 "max": f"""
-                from(bucket: "{INFLUXDB_BUCKET}")
+                from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
-                |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
-                |> keep(columns: ["type", "_field", "_value"])
-                |> group(columns: ["type", "_field"])
+                |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
+                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
                 |> max()
                 """,
+
                 "min": f"""
-                from(bucket: "{INFLUXDB_BUCKET}")
+                from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
-                |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_ID}")
-                |> keep(columns: ["type", "_field", "_value"])
-                |> group(columns: ["type", "_field"])
+                |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
+                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
                 |> min()
                 """
             }
@@ -441,7 +378,7 @@ class InfluxDBServices:
                 result = self.connector.query_api.query(org=self.connector.org, query=query)
                 for table in result:
                     for record in table.records:
-                        variable_name = record.values.get("_field", "N/A")
+                        variable_name = record.values.get("observed_property", "N/A")
                         unit = self.unit_mapping.get(variable_name, "N/A")
                         data_key = (record.values.get("type", "N/A"), variable_name)
                         
@@ -465,7 +402,7 @@ class InfluxDBServices:
             return list(data.values())
 
         except Exception as e:
-            logging.error(f"Error fetching data for table: {e}")
+            logger.error(f"Error fetching data for table: {e}")
             return []
 
 
@@ -483,7 +420,7 @@ class InfluxDBServices:
         if not experiments_id:
             return []
 
-        print("selected_metric", selected_metric)
+        logger.debug("selected_metric", selected_metric)
 
         # Filtro por métrica si se selecciona una
         metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
@@ -581,114 +518,10 @@ class InfluxDBServices:
             return matrix
 
         except Exception as e:
-            print(f"Error retrieving test data for experiment_id {experiment_id}: {e}")
+            logger.error(f"Error retrieving test data for experiment_id {experiment_id}: {e}")
         return []
 
 
-    def get_recent_experiment_ids(self, bucket: str, minutes: int = 5):
-        """
-        Returns experiment IDs with data in the last `minutes` minutes.
-        """
-        query = f'''
-        import "influxdata/influxdb/schema"
-        from(bucket: "{bucket}")
-        |> range(start: -{minutes}m)
-        |> keep(columns: ["{str(BACH_ID)}"])
-        |> group(columns: ["{str(BACH_ID)}"])
-        |> distinct(column: "{str(BACH_ID)}")
-        |> sort(columns: ["{str(BACH_ID)}"])
-        '''
-        tables = self.connector.query_api.query(org=self.connector.org, query=query)
-        experiment_ids = []
-        for table in tables:
-            for record in table.records:
-                experiment_ids.append(record.get_value())
-        return list(set(experiment_ids))
-
-    def write_points(self, points):
-        with self.connector.client.write_api(write_options=SYNCHRONOUS) as write_api:
-            for p in points:
-                point = Point(p["measurement"])
-
-                # Add tags if present
-                if "tags" in p:
-                    for tag_key, tag_value in p["tags"].items():
-                        point = point.tag(tag_key, tag_value)
-
-                # Add fields if present
-                if "fields" in p:
-                    for field_key, field_value in p["fields"].items():
-                        point = point.field(field_key, field_value)
-                else:
-                    print("❌ No fields provided. Point will not be written.")
-                    continue  # Skip this point if it has no fields
-
-                # Add timestamp if defined
-                if "time" in p:
-                    time_value = p["time"]
-                    try:
-                        #Detect string and parse if necessary
-                        if isinstance(time_value, str):
-                            try:
-                                # Try ISO format first
-                                time_value = datetime.fromisoformat(time_value.replace("Z", "+00:00"))
-                            except ValueError:
-                                # Try fallback format if ISO fails
-                                time_value = datetime.strptime(time_value, "%m/%d/%Y %H:%M:%S.%f")
-                        point = point.time(time_value, WritePrecision.NS)
-                    except ValueError as ve:
-                        print(f"❌ Invalid date format: {time_value}. Error: {ve}")
-                        continue  # Skip point if time is invalid
-
-                print("✅ Writing point:", point.to_line_protocol())
-                write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)
-    
-    def get_count_data_experiment_ids(self, time_range="0"):
-        """
-        Retrieves a DataFrame with experiment_IDs and their count from the specified bucket in InfluxDB.
-
-        Args:
-            bucket_name (str): Name of the InfluxDB bucket to query.
-            time_range (str): Time range for the query (default is "-90d").
-
-        Returns:
-            pd.DataFrame: A DataFrame with two columns:
-                        - 'experiment_id': the unique ID of each experiment
-                        - 'num_points': the number of data points associated with each experiment_id
-        """
-        try:
-            # Build the Flux query to retrieve all experiment_id values
-            query = f"""
-            from(bucket: "{INFLUXDB_BUCKET}")
-            |> range(start: {time_range})
-            |> filter(fn: (r) => exists r["{str(BACH_ID)}"])  // Ensure experiment_id field exists
-            |> keep(columns: ["{str(BACH_ID)}"])              // Keep only the experiment_id column
-            """
-
-            # Execute the query
-            result = self.connector.query_api.query(org=self.connector.org, query=query)
-
-            # Extract experiment_id values from query results
-            experiment_ids = [
-                record.values.get(str(BACH_ID))                # Access the value of the experiment_id field
-                for table in result
-                for record in table.records
-                if str(BACH_ID) in record.values               # Ensure the field is present
-            ]
-
-            # Convert the list of IDs to a DataFrame
-            df = pd.DataFrame(experiment_ids, columns=['experiment_id'])
-
-            # Count the occurrences of each experiment_id
-            count_df = df['experiment_id'].value_counts().reset_index()
-            count_df.columns = ['experiment_id', 'num_points']  # Rename columns to match expected format
-
-            return count_df
-
-        except Exception as e:
-            # Handle any unexpected error and return empty DataFrame
-            print(f"Error retrieving experiment_ID from bucket '{self.connector.bucket}': {e}")
-            return pd.DataFrame(columns=['experiment_id', 'num_points'])
 
     def get_data_experiment_id(self, experiment_id: str, minutes: int = 5) -> pd.DataFrame:
         """
@@ -704,16 +537,10 @@ class InfluxDBServices:
         try:
             # Build Flux query
             query = f'''
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: -{minutes}m)
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_id}")
+            |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{experiment_id}")
             |> limit(n: 1)  // Stop early as we only need to check for existence
-            '''
-            query = f'''
-            from(bucket: "{self.connector.bucket}")
-            |> range(start: 0)
-            |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{experiment_id}")
-            
             '''
 
             result = self.connector.query_api.query(org=self.connector.org, query=query)
@@ -729,7 +556,7 @@ class InfluxDBServices:
             return df
 
         except Exception as e:
-            print(f"[Error] get_data_experiment_id('{experiment_id}', {minutes}): {e}")
+            logger.error(f"get_data_experiment_id('{experiment_id}', {minutes}): {e}")
             return pd.DataFrame()
 
     def update_point_tags_safe(self, measurement, timestamp_str, field_to_update, new_value, new_tags):
@@ -757,7 +584,7 @@ class InfluxDBServices:
                     all_records.append(record.values)
 
             if not all_records:
-                print("⚠️ No points found for that timestamp.")
+                logger.warning("⚠️ No points found for that timestamp.")
                 return
 
             # 🗑 Delete all points in that _measurement and timestamp
@@ -810,7 +637,7 @@ class InfluxDBServices:
         """
         try:
             if not time_unit or not time_value:
-                print("[WARNING] Invalid time range parameters.")
+                logger.warning("Invalid time range parameters.")
                 return []
 
             # Map full unit to InfluxDB shorthand
@@ -823,16 +650,17 @@ class InfluxDBServices:
             }
 
             if time_unit not in unit_map:
-                print(f"[WARNING] Unsupported time unit: {time_unit}")
+                logger.warning(f"Unsupported time unit: {time_unit}")
                 return []
 
             shorthand = unit_map[time_unit]
             flux_query = f"""
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: -{time_value}{shorthand})
-            |> filter(fn: (r) => exists r["_measurement"])
-            |> group(columns: ["_measurement"])
-            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> filter(fn: (r) => exists r["batch_id"])
+            |> keep(columns: ["_time", "_value", "batch_id", "device_id", "observed_property"])
+            |> group(columns: ["batch_id"])
+            |> pivot(rowKey:["_time"], columnKey: ["observed_property"], valueColumn: "_value")
             """
 
             result = self.connector.query_api.query_data_frame(flux_query)
@@ -848,15 +676,15 @@ class InfluxDBServices:
                 #print("[INFO] No recent data found.")
                 return []
 
-            if "_measurement" not in df.columns:
-                print("[WARNING] No experiment ID field found.")
+            if "batch_id" not in df.columns:
+                logger.warning("No experiment ID field found.")
                 return []
 
-            experiment_ids = df["_measurement"].unique()
+            experiment_ids = df["batch_id"].unique()
             results = []
 
             for exp_id in experiment_ids:
-                df_exp = df[df["_measurement"] == exp_id]
+                df_exp = df[df["batch_id"] == exp_id]
                 batch_size = int(df_exp.shape[0])
                 start_time = df_exp["_time"].min()
                 end_time = df_exp["_time"].max()
@@ -874,79 +702,9 @@ class InfluxDBServices:
             return results
 
         except Exception as e:
-            print(f"[ERROR] get_online_experiments_summary: {e}")
+            logger.error(f"get_online_experiments_summary: {e}")
             return []
 
-
-    def get_previous_experiments_summary(self, minutes=5):
-        """
-        Devuelve resumen de experimentos que NO tienen datos en los últimos N minutos:
-        Experiment ID, Batch size, Yields, Temperatura promedio.
-        """
-        try:
-            # 1. Obtener todos los experimentos históricos
-            all_experiments = self.get_distinct_experiment_ids()
-
-            # 2. Obtener experimentos con datos recientes
-            recent_query = f"""
-            from(bucket: "{self.connector.bucket}")
-            |> range(start: -{minutes}m)
-            |> filter(fn: (r) => exists r["_measurement"])
-            |> keep(columns: ["_measurement"])
-            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-            """
-
-            recent_df = self.connector.query_api.query_data_frame(recent_query)
-
-            recent_experiments = recent_df["_measurement"].unique().tolist() if not recent_df.empty else []
-
-            # 3. Filtrar solo los experimentos que NO están en los recientes
-            previous_experiments = [exp for exp in all_experiments if exp not in recent_experiments]
-
-            if not previous_experiments:
-                return []
-
-            results = []
-
-            # 4. Recorrer los experimentos previos y obtener resumen de cada uno
-            for exp_id in previous_experiments:
-                query = f"""
-                from(bucket: "{self.connector.bucket}")
-                |> range(start: 0)
-                |> filter(fn: (r) => r["_measurement"] == "{exp_id}")
-                |> group(columns: ["_measurement"])
-                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-                """
-
-                df = self.connector.query_api.query_data_frame(query)
-
-                if df.empty:
-                    continue
-
-                batch_size = int(df.shape[0])
-
-                real_vars = [col for col in df.columns if not col.startswith("pred_") and col not in ["result", "table", "_start", "_stop", "_time", "_measurement", "experiment_id"]]
-                yields = int(len(real_vars))
-
-                temperature = float(df["temperature"].mean()) if "temperature" in df.columns else "N/A"
-
-                # Última fecha de dato
-                last_date = df["_time"].max()
-                last_date_str = pd.to_datetime(last_date).strftime("%Y-%m-%d %H:%M:%S") if pd.notna(last_date) else "N/A"
-
-                results.append({
-                    "Experiment ID": exp_id,
-                    "Date": last_date_str,
-                    "Batch size": batch_size,
-                    "Yields": yields,
-                    "Temperature": round(temperature, 2) if isinstance(temperature, (float, int)) else "N/A"
-                })
-
-            return results
-
-        except Exception as e:
-            print(f"[ERROR] get_previous_experiments_summary: {e}")
-            return []
 
     def get_recent_data_for_graph(self):
         """
@@ -957,32 +715,64 @@ class InfluxDBServices:
         """
         try:
             flux_query = f"""
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
             |> range(start: 0)  // Get all data from the beginning
-            |> filter(fn: (r) => exists r["_measurement"])
-            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> filter(fn: (r) => exists r["{str(INFLUXDB_BATCH_ID)}"])
+            |> keep(columns: ["_time", "_value", "batch_id", "device_id", "observed_property"])
+            |> group(columns: ["batch_id"])
+            |> pivot(rowKey:["_time"], columnKey: ["observed_property"], valueColumn: "_value")
             """
 
             result = self.connector.query_api.query_data_frame(flux_query)
 
             if isinstance(result, list):
                 if not result:
-                    print("[INFO] No data found in the database.")
+                    logger.info("No data found in the database.")
                     return pd.DataFrame()
                 df = pd.concat(result, ignore_index=True)
             else:
                 df = result
 
             if df.empty:
-                print("[INFO] No data found in the database.")
+                logger.info("No data found in the database.")
                 return pd.DataFrame()
 
-            if "_time" not in df.columns or "_measurement" not in df.columns:
-                print("[WARNING] Required fields are missing.")
+            if "_time" not in df.columns or INFLUXDB_BATCH_ID not in df.columns:
+                logger.warning("Required fields are missing.")
                 return pd.DataFrame()
-
             return df
 
         except Exception as e:
-            print(f"[ERROR] get_recent_data_for_graph: {e}")
+            logger.error(f"get_recent_data_for_graph: {e}")
             return pd.DataFrame()
+        
+    from datetime import datetime, timezone
+
+    def get_last_timestamp_for_experiment(self, experiment_id: str):
+        """
+        Return the last timestamp for a given experiment_id within the last 90 days.
+        If no data is found, returns None.
+        """
+        try:
+            query = f'''
+            from(bucket: "{str(self.buckets["RAW"])}")
+            |> range(start: -90d)
+            |> filter(fn: (r) => r["batch_id"] == "{experiment_id}")
+            |> keep(columns: ["_time", "_value", "batch_id", "device_id", "observed_property"])
+            |> sort(columns: ["_time"], desc: true)
+            |> limit(n:1)
+            |> pivot(rowKey:["_time"], columnKey: ["observed_property"], valueColumn: "_value")
+            '''
+            
+            result = self.connector.query_api.query(query)
+
+            logger.debug(f"result: {result}")        
+
+            for table in result:
+                for record in table.records:
+                    return record.get_time()  # datetime UTC
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting last timestamp for {experiment_id}: {e}")
+            return None

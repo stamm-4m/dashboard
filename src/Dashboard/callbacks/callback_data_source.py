@@ -3,7 +3,7 @@ from dash import Input, Output, State, dcc, html, dash_table, MATCH
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.config import NAME_PROJECT,PROJECT_ID
+from Dashboard.config import NAME_PROJECT
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
@@ -11,16 +11,18 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import logging
-from datetime import date
+import humanize
+from datetime import date, datetime, timezone
+
+
 
 logger = logging.getLogger(__name__)
-
 
 @dash.callback(
     Output("experiment-dropdown", "value"),
     Output("store-selected-state", "data"),
-    Input("experiment-dropdown", "value"),   # Dispara el callback
-    State("store-selected-state", "data"),   # Solo se lee, no dispara
+    Input("experiment-dropdown", "value"),   
+    State("store-selected-state", "data"),
     prevent_initial_call=True
 )
 def sync_dropdown_and_store(dropdown_value, store_data):
@@ -43,18 +45,35 @@ def sync_dropdown_and_store(dropdown_value, store_data):
     [Input("url", "pathname")]
 )
 def update_dropdowns(pathname):
-    """Load experiment options when page loads or URL changes."""
+    """Load experiment options with last data timestamp when page loads or URL changes."""
     try:
         exp_all = influxdb_handler.get_distinct_experiment_ids()
-        print("Experiments ID: ", exp_all)
+        logger.debug(f"Experiments ID: {exp_all}")
 
-        experiment_options = [{"label": exp, "value": exp} for exp in exp_all]
+        experiment_options = []
+        now = datetime.now(timezone.utc)
 
-        return [experiment_options]  # Siempre lista dentro de otra lista
+        for exp in exp_all:
+            last_ts = influxdb_handler.get_last_timestamp_for_experiment(exp)
+
+            if last_ts:
+                diff = now - last_ts
+                logger.debug(f"diff: {diff}")
+                if diff.days > 90:
+                    label = f"{exp} - more than 3 months ago"
+                else:
+                    diff_str = humanize.naturaltime(diff)  # Ej: "5 minutes ago"
+                    label = f"{exp} - last data {diff_str}"
+            else:
+                label = f"{exp} - more than 3 months ago"
+
+            experiment_options.append({"label": label, "value": exp})
+
+        return [experiment_options]
+
     except Exception as e:
-        print(f"Error updating dropdowns: {e}")
+        logger.error(f"Error updating dropdowns: {e}")
         return [[]]
-
 
 @dash.callback(
     Output("duration-text", "children"),
@@ -67,12 +86,12 @@ def update_duration_text(experiment_id):
     
     try:
         duration = influxdb_handler.get_experiment_duration(experiment_id)
-        print(duration)
+        logger.debug(f"duration: {duration}")
         if duration >= 24:
             return f"Experiment Duration: {round(duration / 24)} days"
         return f"Experiment Duration: {round(duration)} hours"
     except Exception as e:
-        print(f"Error fetching experiment duration: {e}")
+        logger.error(f"Error fetching experiment duration: {e}")
         return "Experiment Duration: Error"
 
 @dash.callback(
@@ -102,7 +121,7 @@ def update_table_data(experiment_id):
         return processed_data, title
 
     except Exception as e:
-        print(f"Error updating table data: {e}")
+        logger.error(f"Error updating table data: {e}")
         return [], html.H4("Error loading experiment data")
 
 @dash.callback(
@@ -144,7 +163,7 @@ def toggle_links(experiment_selected, store_data):
         return False, True, store_data
 
     except Exception as e:
-        print(f"[Error] toggle_links: {e}")
+        logger.error(f"toggle_links: {e}")
         store_data["online"] = False
         return False, True, store_data
 
@@ -196,42 +215,31 @@ def display_project_details(value):
 )
 def update_online_experiments(n_intervals, selected_unit, selected_value):
     """
-    Periodically updates the experiment table with online data, applying time filtering
-    based on the selected unit and value.
-
-    Args:
-        n_intervals (int): Number of triggered intervals (from dcc.Interval).
-        selected_unit (str): Time unit selected by the user (seconds, minutes, etc.).
-        selected_value (int): Time range value selected by the user.
-
-    Returns:
-        list: List of dictionaries with experiment data filtered by the selected time window.
+    Periodically updates the experiment table with online data, applying time filtering.
+    Avoids redundant updates when no data is found.
     """
     try:
         if not selected_unit or not selected_value:
-            return [], "Please select a valid time range.", "warning", True
-        
+            logger.debug("not selected_unit or not selected_value")
+            return dash.no_update, "No selected unit or selected value.", "info", True
         summary = influxdb_handler.get_online_experiments_summary(
             time_unit=selected_unit,
             time_value=selected_value
         )
 
         if not summary:
-            return [], "No recent data found for the selected time range.", "info", True
+            logger.debug("not summary")
+            return dash.no_update, "No recent data found for the selected time range.", "info", True
 
-
-        # Si la función devuelve un solo dict, lo empaquetas como lista
+        # Si hay datos, los mostramos y ocultamos el mensaje
         if isinstance(summary, dict):
-            return [summary], "", "info", False  # Hide the alert when there is data
-        
-        if isinstance(summary, list) and summary:
-            return summary, "", "info", False  # Hide the alert when there is data
+            return [summary], "", "info", False
+        elif isinstance(summary, list) and summary:
+            return summary, "", "info", False
 
-        # Fallback if summary is a list but empty (precaución extra)
-        return [], "No recent data found for the selected time range.", "info", True
 
     except Exception as e:
-        print(f"[Error] update_online_experiments: {e}")
+        logger.error(f"update_online_experiments: {e}")
         return [], "An error occurred while fetching the data.", "danger", True
 
 
@@ -244,19 +252,22 @@ def update_online_experiments(n_intervals, selected_unit, selected_value):
 )
 def update_timeseries_data_count(start_date, end_date, selected_field):
     """Updates the time series chart showing valid data point counts per interval."""
-    print("selected_field:", selected_field)
+    logger.debug(f"selected_field:{selected_field}")
     try:
         if not start_date or not end_date or not selected_field:
+            logger.debug(f"not start_date or not end_date or not selected_field")
             return go.Figure()
 
         df = influxdb_handler.get_recent_data_for_graph()
         if df.empty or "_time" not in df.columns:
+            logger.debug(f"empty dataframe or column _time no found")
             return go.Figure()
-
+        logger.debug(f"df:\n{df}")
         df["_time"] = pd.to_datetime(df["_time"])
         mask = (df["_time"] >= start_date) & (df["_time"] <= end_date)
         df = df.loc[mask]
         if df.empty:
+            logger.debug(f" empty dataframe")
             return go.Figure()
 
         start, end = pd.to_datetime(start_date), pd.to_datetime(end_date)
@@ -264,9 +275,9 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
 
         # Seleccionar frecuencia automática
         if diff_days <= 1:
-            freq = "H"
+            freq = "h"
         elif diff_days <= 7:
-            freq = "3H"
+            freq = "3h"
         elif diff_days <= 30:
             freq = "D"
         elif diff_days <= 180:
@@ -274,12 +285,12 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
         else:
             freq = "M"
 
-        print(f"Resample frequency: {freq}, Range: {diff_days} days")
+        logger.debug(f"Resample frequency: {freq}, Range: {diff_days} days")
 
         results = []
 
-        for exp_id in df["_measurement"].unique():
-            df_exp = df[df["_measurement"] == exp_id].copy()
+        for exp_id in df["batch_id"].unique():
+            df_exp = df[df["batch_id"] == exp_id].copy()
             df_exp.set_index("_time", inplace=True)
             df_exp = df_exp.sort_index()
 
@@ -299,6 +310,7 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
             results.append(partial_df)
 
         if not results:
+            logger.debug(f"not results")
             return go.Figure()
 
         final_df = pd.concat(results, ignore_index=True)
@@ -321,35 +333,39 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
         return fig
 
     except Exception as e:
-        print(f"[ERROR] update_timeseries_data_count: {e}")
+        logger.error(f"update_timeseries_data_count: {e}")
         return go.Figure()
 
 
 @dash.callback(
     Output("field-selector", "options"),
     Input("interval-component", "n_intervals"),
+    State("field-selector", "options"),
+    prevent_initial_call=True
 )
-def load_field_options(n_intervals):
-    """
-    Dynamically loads available fields from InfluxDB for the dropdown.
-    """
+def load_field_options(interval, current_options):
     try:
         df = influxdb_handler.get_recent_data_for_graph()
-
         if df.empty:
-            return [{"label": "All fields", "value": "all"}]
+            return current_options or [{"label": "All fields", "value": "all"}]
 
-        excluded = ["_time", "_measurement", "experiment_id", "_start", "_stop","result","table","Batch"]
+        excluded = ["_time", "experiment_time", "result", "table", "batch_id"]
         valid_fields = [col for col in df.columns if col not in excluded]
 
-        options = [{"label": "All fields", "value": "all"}]
-        options += [{"label": field.capitalize(), "value": field} for field in valid_fields]
+        new_options = [{"label": "All fields", "value": "all"}]
+        new_options += [{"label": field.capitalize(), "value": field} for field in valid_fields]
 
-        return options
+        # ✅ Evita refrescos si no hay cambios reales
+        if new_options == current_options:
+            return dash.no_update
+
+        logger.debug(f"Updated field options ({len(valid_fields)})")
+        return new_options
 
     except Exception as e:
-        print(f"[ERROR] load_field_options: {e}")
-        return [{"label": "All fields", "value": "all"}]
+        logger.error(f"load_field_options: {e}")
+        return current_options or [{"label": "All fields", "value": "all"}]
+
 
 @dash.callback(
     Output('output-container-date-picker-range', 'children'),

@@ -1,22 +1,18 @@
-from dash import Dash, html, dcc
-import dash_bootstrap_components as dbc
-import Dashboard.callbacks  # Load all callbacks
 import logging
 import sys
-
+from dash import Dash, html, dcc
+import dash_bootstrap_components as dbc
 import flask
-import os
 
-# Cambiar el logger raíz
+# Configuration loggin
 root_logger = logging.getLogger()
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
 root_logger.setLevel(logging.DEBUG)
-
-# Evitar múltiples handlers si se recarga
-if not root_logger.hasHandlers():
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(levelname)s:%(name)s:%(funcName)s: %(message)s')
-    handler.setFormatter(formatter)
-    root_logger.addHandler(handler)
+formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s [func:%(funcName)s]")
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(formatter)
+root_logger.addHandler(console_handler)
 
 # Create the Flask server
 server = flask.Flask(__name__)
@@ -29,6 +25,8 @@ app.layout = html.Div([
     dcc.Store(id="user-session", storage_type="session"),  # Guarda info del usuario logueado
     html.Div(id="page-content")                   # Aquí se carga login o dashboard
 ])
+
+import Dashboard.callbacks  # Load all callbacks
 
 def main():
     app.run(debug=True, host="0.0.0.0", port=8050)
