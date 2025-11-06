@@ -147,7 +147,6 @@ def get_result_metric(score, data_training, data_test,param_dinamic_values,onlin
 # Function to get the parameter information and description of drift detectors
 def get_detector_description(detector_selected):
     # Log the input parameter for debugging purposes
-    print("detector_selected",detector_selected)
     logger.debug(f"Received detector: {detector_selected}")
     default_response = {
             "name": "Unknown Metric",
@@ -168,7 +167,7 @@ def get_detector_description(detector_selected):
         # Handle ADWIN (ADaptive WINdowing)
         elif detector_selected == "ADWIN":
             adwin = Adwin()
-            print("default values: ",adwin._delta)
+            logger.debug(f"default values: {adwin._delta}")
             md_drift_detector = adwin.metadata
             
         # Handle Kolmogorov-Smirnov detector
@@ -274,7 +273,7 @@ def load_estimator_descriptions(selected_estimator, metadata_dict=None):
         # CASE 2: metadata_dict is a dict of detectors
         else:
             detector = metadata_dict.get(selected_estimator)
-        print("detector",detector)
+        
         if detector:
             return {
                 "name": detector.get("name", "Unknown Metric"),

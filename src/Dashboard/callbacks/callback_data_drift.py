@@ -35,7 +35,7 @@ def reload_model_options(n_clicks):
     prevent_initial_call=True
 )
 def update_metrics_section(selected_metric, selected_model):
-    print("selected_metric",selected_metric)
+    logger.debug(f"selected_metric: {selected_metric}")
     if not selected_metric:
         return html.Div(),{"display": "none"}  # If no metric is selected, return an empty div,# If no model is selected, leave it empty
     
@@ -55,7 +55,7 @@ def update_metrics_section(selected_metric, selected_model):
 
     # Get metric configuration parameters
     method_params = metric_info.get("configuration", {})
-    print("method_params : ",method_params)
+    logger.debug("configuration method_params : {method_params}")
     # Dynamically build inputs
     inputs = []
     new_metric_section = dbc.Card([
@@ -146,15 +146,14 @@ def update_metrics_section(selected_metric, selected_model):
     prevent_initial_call=True
 )
 def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, metric_score, param_dinamic_values,range_slider):
-    print("metric_score: ", metric_score)
+    logger.debug(f"metric_score: {metric_score}")
     if not (soft_sensor and experiment_id):
-        print("dash.no_update")
+        logger.warning("dash.no_update not soft sensor and experiment id")
         return dash.no_update  # Prevent update if values are missing
 
     band_univariable = metric_score.strip() in UNIVARIABLE_METRICS
-    print(band_univariable)
-    print(selected_input)
-    logger.warning(" values: band_univariable {band_univariable},  selected_input {selected_input}")
+
+    logger.debug(f"values: band_univariable {band_univariable},  selected_input {selected_input}")
 
     if band_univariable and not selected_input:
         logger.warning(" No update: band_univariable and selected_input")
@@ -166,10 +165,10 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
 
     # 2. Extract values from experiments_id
     experiments_id = training_info.get("experiments_ID", {})
-    print("training info experiments_id", experiments_id)
+    logger.debug(f"training info experiments_id {experiments_id}")
     if not experiments_id:
         return dash.no_update  # Prevent errors if no data is found
-    print("param_dinamic_values",param_dinamic_values)
+    logger.debug(f"param_dinamic_values {param_dinamic_values}")
     if not param_dinamic_values or has_empty_values(param_dinamic_values):
         return dash.no_update  # Prevent errors if no data is found
 
@@ -179,7 +178,8 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
 
     test_data = np.array(test_data).ravel()
     training_data = np.array(training_data).ravel()
-
+    #logger.debug(f"training_data: \n {training_data}")
+    #logger.debug(f"test_data: \n {test_data}")
     # CAUTION: is only for test when no exists any trainig data
     # --------------------------------------------------------- 
     if len(training_data) == 0:
@@ -261,14 +261,43 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
     Output("store-metric-params", "data"),
     Input({'type': 'metric-param-input', 'metric': ALL, 'name': ALL}, 'value'),
     State({'type': 'metric-param-input', 'metric': ALL, 'name': ALL}, 'id'),
+    State('url', 'pathname'),
 )
-def process_dynamic_inputs(values, ids):
+def process_dynamic_inputs(values, ids, pathname):
+    """
+    Processes dynamic metric parameter inputs from the user interface.
+    Groups parameters by metric and updates only when all required parameters
+    for a metric are filled.
+    """
+    #logger.debug(f"pathname: {pathname}")
+    if pathname != "/monitoring/data-drift":  # o la ruta real
+        return dash.no_update
+    
+    if not values or not ids:
+        logger.debug("No data received for metric parameters.")
+        return dash.no_update
+
     grouped = {}
+
+    # Organize all parameters by metric
     for value, id_ in zip(values, ids):
-        metric = id_.get('metric')
-        name = id_.get('name')
-        print(f"Métrica: {metric}, Parámetro: {name}, Valor: {value}")
+        metric = id_.get("metric")
+        name = id_.get("name")
         grouped.setdefault(metric, {})[name] = value
+
+    # Check that every parameter for every metric is filled
+    all_complete = True
+    for metric, params in grouped.items():
+        if any(v in (None, "", []) for v in params.values()):
+            logger.debug(f"Metric {metric} is incomplete: {params}")
+            all_complete = False
+            break
+
+    if not all_complete:
+        logger.debug("Not all metric parameters are filled; skipping update.")
+        return dash.no_update
+
+    logger.debug(f"All metric parameters complete: {grouped}")
     return grouped
 
 def render_dynamic_result(result, index=None):
@@ -351,7 +380,7 @@ def update_size_slider_labels(data, slider_range):
             - int: The maximum slider value (total number of available timestamps).
     """
     if not data or "selected_experiment" not in data or not data["selected_experiment"]:
-        print("No experiment ID Selected")
+        logger.info("No experiment ID Selected")
         return "", 0
     
     # Consulta últimos datos online (últimos 5 min)

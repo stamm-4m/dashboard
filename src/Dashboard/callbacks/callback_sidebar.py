@@ -3,8 +3,7 @@ from dash import Input, Output, html, State
 from Dashboard.layouts.auth_layout import login_form 
 from Dashboard.layouts.main_layout import layout 
 from Dashboard.pages.data_source import data_source_layout
-from Dashboard.pages.softsensor_offline import sofsensor_offline_layout
-from Dashboard.pages.softsensor_online import softsensor_online_layout
+from Dashboard.pages.softsensors import softsensors_layout
 from Dashboard.pages.data_drift import data_drift_layout
 from Dashboard.pages.model_upload import model_upload_layout
 from Dashboard.pages.performance_estimator import performance_estimator_layout
@@ -27,10 +26,8 @@ def display_page(pathname, session_data):
         return home_layout()
     if pathname == "/data-source":
         return data_source_layout()
-    elif pathname == "/soft-sensors/offline":
-        return sofsensor_offline_layout()
-    elif pathname == "/soft-sensors/online":
-        return softsensor_online_layout()
+    elif pathname == "/soft-sensors":
+        return softsensors_layout()
     elif pathname == "/soft-sensors/load-soft-sensor":
          return model_upload_layout()
     elif pathname == "/monitoring/data-drift":
@@ -49,15 +46,6 @@ def display_page(pathname, session_data):
         return not_found_layout()
     
 
-# Callback to toggle soft sensors Offline/Online option
-@dash.callback(
-    Output("soft-sensors-collapse", "is_open"),
-    Input("step-2", "n_clicks"),
-    prevent_initial_call=True
-)
-def toggle_soft_sensors(n):
-    return True if n and n % 2 != 0 else False 
-
 @dash.callback(
     Output("monitoring-collapse", "is_open"), 
     Input("step-3", "n_clicks"), 
@@ -65,39 +53,6 @@ def toggle_soft_sensors(n):
 )
 def toggle_monitoring(n):
     return True if n and n % 2 != 0 else False
-
-@dash.callback(
-    [
-        Output("offline-link", "className"),
-        Output("online-link", "className"),
-    ],
-    Input("url", "pathname"),
-    Input("store-selected-state", "data"),  
-)
-def update_active_links(pathname, store_data):
-    """
-    Update sidebar link classes based on pathname and the 'online' state stored.
-    - Only the active link remains clickable.
-    - The inactive link is disabled (not clickable).
-    """
-
-    # valores base
-    offline_class = "sidebar-link ms-4"
-    online_class = "sidebar-link ms-4"
-
-    online_state = store_data.get("online") if store_data else False
-
-    if online_state:
-        # online activo y clickeable
-        online_class += " active"
-        offline_class += " disabled"
-    else:
-        # offline activo y clickeable
-        offline_class += " active"
-        online_class += " disabled"
-
-    return offline_class, online_class
-
 
 @dash.callback(
     [
@@ -124,8 +79,7 @@ def update_step(pathname, step_data):
     # Define steps and their URLs
     step_paths = {
         "/data-source": 1,
-        "/soft-sensors/offline": 2,
-        "/soft-sensors/online": 2,
+        "/soft-sensors": 2,
         "/monitoring/data-drift": 3,
         "/monitoring/performance": 3,
         "/maintenance": 4

@@ -1,5 +1,6 @@
-from Dashboard.config import  ( INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BUCKET,INFLUXDB_BATCH_ID,
-                               INFLUXDB_BUCKET_METADATA,INFLUXDB_BUCKET_PREDICTIONS,INFLUXDB_BUCKET_RAW,INFLUXDB_MEASUREMENT)
+from Dashboard.config import  ( INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_PROJECT_NAME,INFLUXDB_BATCH_ID,
+                               INFLUXDB_BUCKET_METADATA,INFLUXDB_BUCKET_PREDICTIONS,INFLUXDB_BUCKET_RAW,INFLUXDB_MEASUREMENT,
+                               INFLUXDB_DEVICE_ID)
                             
 from Dashboard.db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
 from influxdb_client import Point, WritePrecision
@@ -141,7 +142,7 @@ class InfluxDBServices:
             query = f"""
             from(bucket: "{str(self.buckets["RAW"])}")
             |> range(start: {str(start_flux)})  // Adjust the time range as needed
-            |> filter(fn: (r) => r["_measurement"] == "{str(batch_id)}")
+            |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(batch_id)}")
             """
 
             #print("query", query)
@@ -151,7 +152,7 @@ class InfluxDBServices:
 
             # If no results returned, print and return empty DataFrame
             if not results:
-                print(f"No data found for batch_id {batch_id}.")
+                logger.debug(f"No data found for batch_id {batch_id}.")
                 return pd.DataFrame()
 
             # Prepare data list
@@ -167,10 +168,10 @@ class InfluxDBServices:
             # Check if the DataFrame is non-empty
             if not df.empty:
                 # Select only relevant columns
-                df = df[["_time", "_field", "_value"]]
+                df = df[["_time", "observed_property", "_value"]]
 
                 # Pivot the DataFrame
-                df_pivot = df.pivot(index="_time", columns="_field", values="_value")
+                df_pivot = df.pivot(index="_time", columns="observed_property", values="_value")
 
                 # Reset index to make '_time' a column again
                 df_pivot.reset_index(inplace=True)
@@ -181,7 +182,7 @@ class InfluxDBServices:
                 return pd.DataFrame()
 
         except ValueError as ve:
-            print(f"Invalid input: {ve}")
+            logger.error(f"Invalid input: {ve}")
             return pd.DataFrame()
 
         except Exception as e:
@@ -190,52 +191,69 @@ class InfluxDBServices:
     
     def get_data_until_latest(self, batch_id):
         """
-        Returns a DataFrame with all records up to the latest entry for a given batch_id.
+        Returns a DataFrame with one row per timestamp, containing:
+        - Raw values for each observed property.
+        - A single predicted value column (penicillin concentration).
 
         Args:
-            batch_id (int/str): The batch identifier.
+            batch_id (int | str): The batch identifier.
 
         Returns:
-            pd.DataFrame: DataFrame with all data up to the most recent point.
+            pd.DataFrame: Combined table with '_time' as index.
         """
         try:
             if not batch_id:
                 raise ValueError("The batch_id cannot be None or empty.")
 
-            # Flux query to retrieve all data for the given batch_id
-            query = f"""
-            from(bucket: "{str(self.buckets['RAW'])}")
-            |> range(start: 0)  // Get all data from the beginning of the bucket
-            |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(batch_id)}")
-            """
-            
-            results = self.connector.query_api.query(query=query)
+            # Flux query
+            raw_query = f"""
+                from(bucket: "stamm_raw")
+                |> range(start: 0)
+                |> filter(fn: (r) => r["batch_id"] == "{batch_id}")
+                |> filter(fn: (r) => r["_measurement"] == "{str(INFLUXDB_MEASUREMENT)}")
+                |> filter(fn: (r) => r["project_name"] == "{str(INFLUXDB_PROJECT_NAME)}")
+                |> filter(fn: (r) => r["device_id"] == "{str(INFLUXDB_DEVICE_ID)}")
+                |> rename(columns: {{_value: "raw_value"}})
+                |> keep(columns: ["_time", "observed_property", "raw_value"])
+                |> pivot(rowKey:["_time"], columnKey: ["observed_property"], valueColumn: "raw_value")
+                """
 
-            if not results:
-                print(f"No data found for batch_id {batch_id}.")
-                return pd.DataFrame()
-
-            data = []
-            for table in results:
-                for record in table.records:
-                    data.append(record.values)
-
-            df = pd.DataFrame(data)
-
-            if not df.empty:
-                df = df[["_time", "_field", "_value"]]
-                df_pivot = df.pivot(index="_time", columns="_field", values="_value")
-                df_pivot.reset_index(inplace=True)
-                return df_pivot
-            else:
+            pred_query = f"""
+                from(bucket: "stamm_predictions")
+                |> range(start: 0)
+                |> filter(fn: (r) => r["batch_id"] == "{batch_id}")
+                |> filter(fn: (r) => r["_measurement"] == "{str(INFLUXDB_MEASUREMENT)}")
+                |> filter(fn: (r) => r["project_name"] == "{str(INFLUXDB_PROJECT_NAME)}")
+                |> filter(fn: (r) => r["device_id"] == "{str(INFLUXDB_DEVICE_ID)}")
+                |> rename(columns: {{_value: "prediction_value"}})
+                |> keep(columns: ["_time", "model_id", "prediction_value"])
+                |> pivot(rowKey:["_time"], columnKey: ["model_id"], valueColumn: "prediction_value")
+                """
+           
+            df_raw = self.connector.query_api.query_data_frame(raw_query)
+            df_pred = self.connector.query_api.query_data_frame(pred_query)
+            if df_raw.empty and df_pred.empty:
                 logger.info(f"No data found for batch_id {batch_id}.")
                 return pd.DataFrame()
+            
+            # --- Prepare DataFrames ---
+            df_raw["_time"] = pd.to_datetime(df_raw["_time"])
+            df_pred["_time"] = pd.to_datetime(df_pred["_time"])
+
+            # --- Set _time as index ---
+            df_raw = df_raw.set_index("_time").sort_index()
+            df_pred = df_pred.set_index("_time").sort_index()
+
+            # --- Merge raw + predictions by nearest timestamp ---
+            df_final = pd.merge_asof(df_raw, df_pred, left_index=True, right_index=True, direction="nearest")
+
+            df_final = df_final.reset_index()
+
+            return df_final
 
         except Exception as e:
             logger.error(f"Error retrieving data until latest for batch_id {batch_id}: {e}")
             return pd.DataFrame()
-
-
 
     def get_distinct_experiment_ids(self, time_range="0"):
         """
@@ -420,19 +438,19 @@ class InfluxDBServices:
         if not experiments_id:
             return []
 
-        logger.debug("selected_metric", selected_metric)
+        logger.debug(f"selected_metric: {selected_metric}")
 
         # Filtro por métrica si se selecciona una
-        metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
+        metric_filter = f'|> filter(fn: (r) => r["observed_property"] == "{selected_metric}")' if selected_metric else ""
 
         # Consulta Flux
         query = f'''
-            from(bucket: "{self.connector.bucket}")
+            from(bucket: "{self.buckets["RAW"]}")
                 |> range(start: 0)
-                |> filter(fn: (r) => {" or ".join(f'r["{str(BACH_ID)}"] == "{str(e)}"' for e in experiments_id)})
+                |> filter(fn: (r) => {" or ".join(f'r["{str(INFLUXDB_BATCH_ID)}"] == "{str(e)}"' for e in experiments_id)})
                 {metric_filter}
-                |> keep(columns: ["_time", "_value", "_field"])
-                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> keep(columns: ["_time", "_value", "observed_property"])
+                |> pivot(rowKey: ["_time"], columnKey: ["observed_property"], valueColumn: "_value")
                 |> sort(columns: ["_time"])
         '''
         # Ejecutar consulta
@@ -471,15 +489,15 @@ class InfluxDBServices:
                 raise ValueError("The experiment_id cannot be None or empty.")
 
             # Filtro por métrica solo si se proporciona
-            metric_filter = f'|> filter(fn: (r) => r["_field"] == "{selected_metric}")' if selected_metric else ""
+            metric_filter = f'|> filter(fn: (r) => r["observed_property"] == "{selected_metric}")' if selected_metric else ""
 
             # Flux query
             query = f"""
-                from(bucket: "{self.connector.bucket}")
+                from(bucket: "{self.buckets["RAW"]}")
                     |> range(start: 0)
-                    |> filter(fn: (r) => r["{str(BACH_ID)}"] == "{str(experiment_id)}")
+                    |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(experiment_id)}")
                     {metric_filter}
-                    |> keep(columns: ["_field", "_value"])
+                    |> keep(columns: ["_time", "_value", "observed_property"])
             """
 
             # Ejecutar la consulta
@@ -489,7 +507,7 @@ class InfluxDBServices:
             field_values = {}
             for table in result:
                 for record in table.records:
-                    field = record.get_field()
+                    field = record.values.get("observed_property")
                     value = record.get_value()
                     field_values.setdefault(field, []).append(value)
 
@@ -513,7 +531,7 @@ class InfluxDBServices:
                 if 0 <= start_idx < matrix.shape[0] and 0 < end_idx <= matrix.shape[0]:
                     matrix = matrix[start_idx:end_idx, :]
                 else:
-                    print("⚠️ range_slider fuera de rango en get_data_test, devolviendo todo el dataset")
+                    logger.debug("⚠️ range_slider fuera de rango en get_data_test, devolviendo todo el dataset")
 
             return matrix
 
@@ -765,8 +783,6 @@ class InfluxDBServices:
             '''
             
             result = self.connector.query_api.query(query)
-
-            logger.debug(f"result: {result}")        
 
             for table in result:
                 for record in table.records:

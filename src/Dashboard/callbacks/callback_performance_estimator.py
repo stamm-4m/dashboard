@@ -10,7 +10,7 @@ import logging
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils import model_information
 from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models,load_estimator_descriptions,compute_metric,reorder_dataframe_for_table
-from Dashboard.utils.utils_global import disabled_figure, generate_prediction_name
+from Dashboard.utils.utils_global import disabled_figure
 
 logger = logging.getLogger(__name__) 
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
         )
 def update_model_options(n_clicks):
     reload_models()
-    return model_information.get_model_name_options()
+    return model_information.get_model_id_options()
 
 @dash.callback(
             Output("performance-plot", "figure", allow_duplicate=True),
@@ -168,7 +168,7 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
         return fig
 
     # Nombre del modelo base
-    base_pred_name = generate_prediction_name(model_data_selected["model_file"])   # base model
+    base_pred_name = model_data_selected["model_id"]   # base model
 
     # Data del experimento
     df_bach = influxdb_handler.get_data_by_batch_id(experiment_id["selected_experiment"])
@@ -250,10 +250,11 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
                 ))
 
         # Add selected models
+        logger.debug(f"models_selected :\n {models_selected}")
         for model_selected in models_selected:
-            model_file = model_information.get_configuration_by_model_name(model_selected)['model_description']['config_files']['model_file']
-            pred_name = generate_prediction_name(model_file)
-
+            pred_name = model_information.get_configuration_by_model_name(model_selected)['model_identification']['ID']
+            logger.debug(f"model_selected:\n {pred_name}")
+            
             if pred_name == base_pred_name:
                 continue
 

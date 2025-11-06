@@ -117,6 +117,31 @@ class ModelInformation:
         
         # Return a list of dictionaries with label and value
         return [{'label': name, 'value': name} for name in sorted(unique_names)]
+    
+    def get_model_id_options(self):
+        """Returns a list of unique model options for a Dash dropdown component.
+
+        Each option includes label, value, name (the model ID), and id (the model UUID).
+        """
+        options = []
+
+        for a_config in self.configurations:
+            model_info = a_config.get("model_identification", {})
+            model_id = model_info.get("ID")
+            model_info = a_config.get("model_description", {})
+            model_name = model_info.get("model_name")
+
+            # Skip invalid entries
+            if not model_id or not model_name:
+                continue
+
+            options.append({
+                "label": model_name,   # Visible in the dropdown
+                "value": model_id,   # Used as value in callbacks
+            })
+
+        #logger.debug(f"Model options generated: {options}")
+        return options
 
     # Function to load inputs from configuration
     def load_inputs_from_configuration(self, model_name):

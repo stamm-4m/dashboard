@@ -121,49 +121,6 @@ def update_table_data(experiment_id):
         return [], html.H4("Error loading experiment data")
 
 @dash.callback(
-    [Output("offline-link", "disabled"),
-     Output("online-link", "disabled"),
-     Output("store-selected-state", "data",allow_duplicate=True)],
-    Input("experiment-dropdown", "value"),
-    State("store-selected-state", "data"),
-    prevent_initial_call=True
-)
-def toggle_links(experiment_selected, store_data):
-    """
-    Enable or disable the 'Online' and 'Offline' links based on whether the selected experiment
-    has received data within the last 5 minutes. Update only the 'online' key in dcc.Store.
-
-    Args:
-        experiment_selected (str): The selected experiment ID from the dropdown.
-        store_data (dict): Current data in the store.
-
-    Returns:
-        (bool, bool, dict): States for offline-link, online-link and updated store data.
-    """
-    # Si no había nada en el store, inicializarlo como diccionario vacío
-    if store_data is None:
-        store_data = {}
-
-    if not experiment_selected:
-        store_data["online"] = False
-        return False, True, store_data
-
-    try:
-        df = influxdb_handler.get_data_experiment_id(experiment_selected, minutes=5)
-
-        if df.shape[0] > 0:
-            store_data["online"] = True
-            return True, False, store_data
-
-        store_data["online"] = False
-        return False, True, store_data
-
-    except Exception as e:
-        logger.error(f"toggle_links: {e}")
-        store_data["online"] = False
-        return False, True, store_data
-
-@dash.callback(
     Output('project-details', 'children'),
     Output("project-name", "children"),
     Input("experiment-dropdown", "value")
@@ -191,8 +148,9 @@ def display_project_details(value):
         - str : A string representing the project name header.
     """
     data_info = model_information.project_details()
+
     if data_info:
-        name = f"Project name: {data_info.get('name',{})}"
+        name = f"Project name: {data_info.get('project_name',{})}"
         data = {
             "description": data_info.get('description', {})
         }

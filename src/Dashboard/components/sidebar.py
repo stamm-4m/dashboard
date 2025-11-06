@@ -40,31 +40,10 @@ def sidebar(session_data = None):
                 # Main soft sensors link
                 dbc.NavLink(
                     html.Span([html.Span("2", className="circle-number"),html.Span("Soft sensors", className="nav-text")], className="nav-item-content"),
-                    href=None,
+                    href="/soft-sensors",
                     className="sidebar-link",
                     id="step-2",
                     active="exact"
-                ),
-                # Collapsible sections (Offline and Online)
-                dbc.Collapse(
-                    [
-                        dbc.NavLink(
-                            "Offline",
-                            href="/soft-sensors/offline",
-                            className="sidebar-link ms-4",  # Margin for sublevel
-                            id="offline-link",
-                        ),
-                        dbc.NavLink(
-                            "Online",
-                            href="/soft-sensors/online",
-                            className="sidebar-link ms-4",  # Margin for sublevel
-                            id="online-link",
-                        ),
-                        # Commented for we will working next version
-                        # dbc.NavLink("Load soft sensor", href="/soft-sensors/load-soft-sensor", className="sidebar-link ms-4", id="load-soft-link"),
-                    ],
-                    id="soft-sensors-collapse",
-                    is_open=False,  # Starts closed
                 ),
                 # Main monitoring
                 dbc.NavLink(
