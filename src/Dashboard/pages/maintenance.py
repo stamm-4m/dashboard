@@ -21,7 +21,8 @@ style_data_conditional=[
 def maintenance_layout():
 
     # Load model options dynamically for layout
-    model_options = model_information.get_model_name_options()
+    model_name_options = model_information.get_model_name_options()
+
     
     # Return only the content specific to the maintenance page
     return html.Div([
@@ -41,13 +42,18 @@ def maintenance_layout():
             ], className="mb-2"),
             dbc.Row([
                 dbc.Col([
-                    dbc.Label("Model Name:"),
-                    dcc.Dropdown(
-                        id='model-selector-maintenance',
-                        options=model_options,
-                        placeholder="Select a model",
-                        style={'width': '100%', 'marginBottom': '10px'}
-                    )
+                    html.Label("Monitoring soft sensor:"),
+                    dcc.Loading(
+                        id="loading-models",
+                        type="circle",
+                        color="#0d6efd",  # Azul Bootstrap
+                        fullscreen=False,
+                        children=dcc.Dropdown(
+                            id='model-selector-maintenance',
+                            options=model_name_options,
+                            placeholder="Select soft sensors",
+                            style={'width': '100%', 'marginBottom': '10px'}
+                    ))
                 ], width=12),
             ]),
             dbc.Row([

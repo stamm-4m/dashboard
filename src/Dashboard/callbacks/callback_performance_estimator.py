@@ -66,7 +66,7 @@ def update_experiment_display(data):
             prevent_initial_call=True
 )
 def update_input_options(selected_model):
-    print("value", selected_model)
+    
     if selected_model:
         return model_information.load_inputs_from_configuration(selected_model)
     return []  # If no model is selected, leave it empty
@@ -168,13 +168,13 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
         return fig
 
     # Nombre del modelo base
-    base_pred_name = model_data_selected["model_id"]   # base model
+    base_pred_name = model_data_selected["model_id"].lower()   # base model
 
     # Data del experimento
-    df_bach = influxdb_handler.get_data_by_batch_id(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_experiment"])
 
     if "_time" not in df_bach.columns:
-        print("⚠️ _time column missing in data")
+        logger.debug("⚠️ _time column missing in data")
         return fig
 
     # Asegurar datetime
@@ -184,14 +184,14 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     timestamps = df_bach["_time"].tolist()
     logger.info(f"range_slider: {range_slider}")
     if range_slider[0] < 0 or range_slider[1] > len(timestamps):
-        print("⚠️ Invalid time window indices")
+        logger.debug("⚠️ Invalid time window indices")
         return fig
 
     start_time = timestamps[range_slider[0]]
     end_time = timestamps[range_slider[1]-1]
     df_window = df_bach[(df_bach["_time"] >= start_time) & (df_bach["_time"] <= end_time)]
     if df_window.empty:
-        print("⚠️ No data in selected window")
+        logger.debug("⚠️ No data in selected window")
         return fig
 
     # 🔹 MODE 1: Update traces when time window changes
@@ -201,7 +201,7 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
         for trace in fig.data:
             model_name = trace.name
             if model_name not in df_window.columns:
-                print(f"⚠️ {model_name} not found in window data")
+                logger.debug(f"⚠️ {model_name} not found in window data")
                 continue
 
             df_valid = pd.DataFrame({"_time": df_window["_time"], "y": df_window[model_name]}).dropna()
@@ -252,18 +252,16 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
         # Add selected models
         logger.debug(f"models_selected :\n {models_selected}")
         for model_selected in models_selected:
-            pred_name = model_information.get_configuration_by_model_name(model_selected)['model_identification']['ID']
-            logger.debug(f"model_selected:\n {pred_name}")
-            
+            pred_name = model_selected.lower()
             if pred_name == base_pred_name:
                 continue
 
             existing_names = [trace.name for trace in fig.data]
             if pred_name in existing_names:
                 continue
-
+            
             if pred_name not in df_window.columns:
-                print(f"⚠️ {pred_name} not found in data.")
+                logger.warning(f"⚠️ {pred_name} not found in data.")
                 continue
 
             df_valid = pd.DataFrame({"_time": df_window["_time"], "y": df_window[pred_name]}).dropna()
@@ -309,16 +307,16 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     prevent_initial_call=True
 )
 def update_metrics_table(models_selected, experiment_id, model_data_selected, existing_data, range_slider, metric_selected):
-    print(f"range_slider: {range_slider}")
+    logger.debug(f"models_selected {models_selected}")
+    logger.debug(f"model_data_selected {model_data_selected}")
     if not models_selected or not model_data_selected or not experiment_id or not range_slider or not metric_selected:
         return dash.no_update, dash.no_update, dash.no_update
     
     ctx = dash.callback_context
     triggered_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    print("triggered_id : ",triggered_id)
-
+    
     # ✅ Obtener datos
-    df_bach = influxdb_handler.get_data_by_batch_id(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_experiment"])
     if "_time" not in df_bach.columns:
         return dash.no_update, dash.no_update, dash.no_update
 
@@ -330,7 +328,7 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
     start_idx, end_idx = range_slider
     if start_idx < 0 or end_idx >= len(df_bach):
         return dash.no_update, dash.no_update, dash._no_update
-    print(f'df_bach.iloc[start_idx:end_idx+1]: {df_bach.iloc[start_idx:end_idx+1]}')
+    
     df_window = df_bach.iloc[start_idx:end_idx+1]
     if df_window.empty:
         return dash.no_update, dash.no_update, dash.no_update
@@ -342,18 +340,17 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
         df_table = pd.DataFrame()
 
      # Loop sobre cada par de modelos seleccionados (incluyendo base)
-    all_models = [model_data_selected["model_name"]] + models_selected
+    all_models = [model_data_selected["model_id"]] + models_selected
 
     for i, model_i in enumerate(all_models):
-        name_file_i = model_information.get_configuration_by_model_name(model_i)['model_description']['config_files']['model_file']
-        pred_i = generate_prediction_name(name_file_i)
+
+        pred_i = model_i.lower()
 
         for j, model_j in enumerate(all_models):
             if i >= j:  # evitar duplicados y diagonal (se llenan simétricamente)
                 continue
 
-            name_file_j = model_information.get_configuration_by_model_name(model_j)['model_description']['config_files']['model_file']
-            pred_j = generate_prediction_name(name_file_j)
+            pred_j = model_j.lower()
 
             # Validar columnas
             if pred_i not in df_window.columns or pred_j not in df_window.columns:
@@ -390,7 +387,7 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
 
     # Reset index para DataTable
     if not df_table.empty:
-        base_name = model_data_selected["model_name"]  # ✅ siempre el modelo base en (0,0)
+        base_name = model_data_selected["model_id"]  # ✅ siempre el modelo base en (0,0)
         df_table, columns = reorder_dataframe_for_table(df_table,model_data_selected)
         # Estilo dinámico: poner en negrita la fila del modelo base
         style_data_conditional = [
@@ -437,7 +434,7 @@ def update_window_size_slider_labels(data, slider_range):
             - int: The maximum slider value (total number of available timestamps).
     """
     if not data or "selected_experiment" not in data or not data["selected_experiment"]:
-        print("No experiment ID Selected")
+        logger.warning("No experiment ID Selected")
         return "", 0
     
     # Consulta últimos datos online (últimos 5 min)

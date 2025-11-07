@@ -230,11 +230,11 @@ def get_metrics_score_options():
         metrics = []
         mds = get_metadata()
         for name, md in mds.items():
-            metrics.append((md["acronym"], name))
+            metrics.append((md["acronym"], md["acronym"]+f" - {md["name"]}"))
     except Exception as e:
         logger.error(f"Error processing metadata score metrics: {e}")
 
-    return [{"label": k, "value": k} for k, v in sorted(metrics)]
+    return [{"label": v, "value": k} for k, v in sorted(metrics)]
 
 def load_estimator_descriptions(selected_estimator, metadata_dict=None):
     """

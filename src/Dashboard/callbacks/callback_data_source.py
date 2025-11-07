@@ -42,24 +42,33 @@ def sync_dropdown_and_store(dropdown_value, store_data):
     [Input("url", "pathname")]
 )
 def update_dropdowns(pathname):
-    """Load experiment options with last data timestamp when page loads or URL changes."""
+    """Load experiment options ordered by most recent timestamp first."""
     try:
         exp_all = influxdb_handler.get_distinct_experiment_ids()
         logger.debug(f"Experiments ID: {exp_all}")
 
-        experiment_options = []
         now = datetime.now(timezone.utc)
+        experiment_data = []
 
+        # Get timestamps and store them for sorting
         for exp in exp_all:
             last_ts = influxdb_handler.get_last_timestamp_for_experiment(exp)
+            experiment_data.append((exp, last_ts))
 
+        # Sort by timestamp (most recent first)
+        experiment_data.sort(key=lambda x: x[1] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
+        # Build dropdown options
+        experiment_options = []
+        for exp, last_ts in experiment_data:
             if last_ts:
                 diff = now - last_ts
-                logger.debug(f"diff: {diff}")
+                logger.debug(f"diff for {exp}: {diff}")
+
                 if diff.days > 90:
                     label = f"{exp} - more than 3 months ago"
                 else:
-                    diff_str = humanize.naturaltime(diff)  # Ej: "5 minutes ago"
+                    diff_str = humanize.naturaltime(diff)
                     label = f"{exp} - last data {diff_str}"
             else:
                 label = f"{exp} - more than 3 months ago"
@@ -71,6 +80,7 @@ def update_dropdowns(pathname):
     except Exception as e:
         logger.error(f"Error updating dropdowns: {e}")
         return [[]]
+
 
 @dash.callback(
     Output("duration-text", "children"),

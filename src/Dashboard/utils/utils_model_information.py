@@ -57,6 +57,13 @@ class ModelInformation:
                 return config
         return None
     
+    def get_configuration_by_model_id(self, model_id):
+        """Returns a specific configuration based on the model id."""
+        for config in self.configurations:
+            if config['model_identification']['ID'] == model_id:
+                return config
+        return None
+    
     def get_configuration_by_model_name_language(self, model_name):
         """Returns a specific configuration based on the model name and language."""
         for config in self.configurations:

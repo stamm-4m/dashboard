@@ -226,7 +226,7 @@ def reorder_dataframe_for_table(df_table, model_data_selected):
     Returns:
         tuple: (df_table_reordered, columns) ready for DataTable.
     """
-    base_name = model_data_selected["model_name"]  # always the model base in (0,0)
+    base_name = model_data_selected["model_id"]  # always the model base in (0,0)
 
     # Reorder columns: first base, then the rest
     cols = [base_name] + [c for c in df_table.columns if c != base_name]

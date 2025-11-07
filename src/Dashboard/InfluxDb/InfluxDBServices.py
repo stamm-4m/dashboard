@@ -248,6 +248,7 @@ class InfluxDBServices:
             df_final = pd.merge_asof(df_raw, df_pred, left_index=True, right_index=True, direction="nearest")
 
             df_final = df_final.reset_index()
+            df_final = df_final.drop(columns=["result_x", "result_y", "table_x", "table_y"], errors="ignore")
 
             return df_final
 
@@ -577,71 +578,6 @@ class InfluxDBServices:
             logger.error(f"get_data_experiment_id('{experiment_id}', {minutes}): {e}")
             return pd.DataFrame()
 
-    def update_point_tags_safe(self, measurement, timestamp_str, field_to_update, new_value, new_tags):
-        """
-        Overwrites all points at a timestamp, updating one of them with new tags.
-        """
-        try:
-            # Convert timestamp with timezone
-            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S.%f%z")
-            start = (timestamp - timedelta(microseconds=1)).isoformat()
-            stop = (timestamp + timedelta(microseconds=1)).isoformat()
-
-            # Query all points with that timestamp and measurement
-            flux_query = f'''
-            from(bucket: "{self.connector.bucket}")
-            |> range(start: {start}, stop: {stop})
-            |> filter(fn: (r) => r["_measurement"] == "{measurement}")
-            '''
-            result = self.connector.query_api.query(flux_query)
-            
-            # Convert result to list of records
-            all_records = []
-            for table in result:
-                for record in table.records:
-                    all_records.append(record.values)
-
-            if not all_records:
-                logger.warning("⚠️ No points found for that timestamp.")
-                return
-
-            # 🗑 Delete all points in that _measurement and timestamp
-            predicate = f'_measurement="{measurement}"'
-            self.connector.client.delete_api().delete(
-                start=start,
-                stop=stop,
-                predicate=predicate,
-                bucket=self.connector.bucket,
-                org=self.connector.org
-            )
-            print(f"🗑 Deleted {len(all_records)} points with timestamp {timestamp_str}")
-
-            # ✍️ Rewrite all points, applying new tags to the field to update
-            with self.connector.client.write_api(write_options=SYNCHRONOUS) as write_api:
-                for rec in all_records:
-                    field = rec["_field"]
-                    value = rec["_value"]
-                    tags = {k: v for k, v in rec.items() if k not in ["_time", "_field", "_value", "_measurement", "result", "table", "_start", "_stop"]}
-
-                    point = Point(measurement).field(field, new_value if field == field_to_update else value).time(timestamp, WritePrecision.NS)
-
-                    # If this is the field to update, add the new tags
-                    if field == field_to_update:
-                        for tag_key, tag_value in new_tags.items():
-                            point = point.tag(tag_key, tag_value)
-                    else:
-                        # Reapply previous tags
-                        for tag_key, tag_value in tags.items():
-                            if tag_value is not None:
-                                point = point.tag(tag_key, tag_value)
-
-                    write_api.write(bucket=self.connector.bucket, org=self.connector.org, record=point)
-
-            print("✅ Points rewritten successfully. Updated field:", field_to_update)
-
-        except Exception as e:
-            print("❌ Error in safe update:", e)
-
     def get_online_experiments_summary(self, time_unit="minutes", time_value=5):
         """
         Retrieves a summary of online experiments based on the specified time window.
@@ -774,7 +710,7 @@ class InfluxDBServices:
         try:
             query = f'''
             from(bucket: "{str(self.buckets["RAW"])}")
-            |> range(start: -90d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["batch_id"] == "{experiment_id}")
             |> keep(columns: ["_time", "_value", "batch_id", "device_id", "observed_property"])
             |> sort(columns: ["_time"], desc: true)
