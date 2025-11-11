@@ -11,7 +11,7 @@ def check_env_var(var_name):
     return value
 
 # InfluxDB connection variables (required)
-INFLUXDB = check_env_var("INFLUXDB")
+DB_ENGINE = check_env_var("DB_ENGINE")
 INFLUXDB_URL = check_env_var("INFLUXDB_URL")
 INFLUXDB_TOKEN = check_env_var("INFLUXDB_TOKEN")
 INFLUXDB_ORG = check_env_var("INFLUXDB_ORG")

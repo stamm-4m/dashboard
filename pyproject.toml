@@ -13,7 +13,7 @@ homepage = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-
 documentation = "https://gitlab.com/soft-sensor-monitoring-and-maintenance-framework-for-machine-learning-models/stamm"
 
 [tool.poetry.dependencies]
-python = "3.12"
+python = "^3.12"
 pandas = "*"
 dash = "3.0.4"
 plotly = "*"

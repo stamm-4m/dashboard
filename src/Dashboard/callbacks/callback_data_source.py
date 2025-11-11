@@ -1,12 +1,10 @@
 import dash
 from dash import Input, Output, State, html
-import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.config import NAME_PROJECT
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
-from Dashboard.utils.utils_data_source import get_variable_category, generate_projects_details_view  # Load the necessary utility functions for the callbacks
+from Dashboard.utils.utils_data_source import format_variable_name, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
 import pandas as pd
 import logging
@@ -63,7 +61,7 @@ def update_dropdowns(pathname):
         for exp, last_ts in experiment_data:
             if last_ts:
                 diff = now - last_ts
-                logger.debug(f"diff for {exp}: {diff}")
+                #logger.debug(f"diff for {exp}: {diff}")
 
                 if diff.days > 90:
                     label = f"{exp} - more than 3 months ago"
@@ -117,10 +115,7 @@ def update_table_data(experiment_id):
         
         processed_data = []
         for row in raw_data:
-            if "Name" in row and row["Name"]:
-                row["Type"] = get_variable_category(row["Name"])
-            else:
-                row["Type"] = "Unknown"
+            row["Type"] = format_variable_name(row["Type"])
             processed_data.append(row)
         
         title = html.H5(f"Statistical summary of the variables from the chosen experiment: {experiment_id}")
@@ -225,7 +220,7 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
         if df.empty or "_time" not in df.columns:
             logger.debug(f"empty dataframe or column _time no found")
             return go.Figure()
-        logger.debug(f"df:\n{df}")
+        #logger.debug(f"df:\n{df}")
         df["_time"] = pd.to_datetime(df["_time"])
         mask = (df["_time"] >= start_date) & (df["_time"] <= end_date)
         df = df.loc[mask]
@@ -248,7 +243,7 @@ def update_timeseries_data_count(start_date, end_date, selected_field):
         else:
             freq = "M"
 
-        logger.debug(f"Resample frequency: {freq}, Range: {diff_days} days")
+        #logger.debug(f"Resample frequency: {freq}, Range: {diff_days} days")
 
         results = []
 
@@ -332,7 +327,7 @@ def load_field_options(interval, current_options):
         if new_options == current_options:
             return dash.no_update
 
-        logger.debug(f"Updated field options ({len(valid_fields)})")
+        #logger.debug(f"Updated field options ({len(valid_fields)})")
         return new_options
 
     except Exception as e:

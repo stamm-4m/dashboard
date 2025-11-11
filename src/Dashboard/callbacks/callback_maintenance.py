@@ -13,7 +13,7 @@ import io
 import sqlite3
 from Dashboard.utils import model_information,sqlite_handler
 import plotly.express as px
-from Dashboard.config import INFLUXDB, BASE_URL_API, INFLUXDB_BUCKET
+from Dashboard.config import DB_ENGINE, BASE_URL_API, INFLUXDB_BUCKET
 import logging
 
 logger = logging.getLogger(__name__) 
@@ -828,7 +828,7 @@ def generate_excel_report(n_clicks, data, experiment_id, model_selected, time_ra
         "Time range end": [time_range[1]],
         "Selected variables": [", ".join([f"{v['variable_name']}" for v in selected_vars])],
         "Model metadata": [f"{BASE_URL_API}/metadata/{prediction_var.split('_')[-1]}"],
-        "Database": [INFLUXDB],
+        "Database": [DB_ENGINE],
         "Bucket": [INFLUXDB_BUCKET],
     }
     df_info = pd.DataFrame(info_dict)

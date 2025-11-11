@@ -1,11 +1,9 @@
 import dash
 from dash.exceptions import PreventUpdate
-from dash import html, dcc, Input, Output, State, ALL
+from dash import html, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import pandas as pd
-import numpy as np
-import re
 import logging
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils import model_information

@@ -368,8 +368,8 @@ class InfluxDBServices:
                 from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
-                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
-                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
+                |> keep(columns: ["device_id", "observed_property", "source", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "source", "_field"])
                 |> mean()
                 """,
 
@@ -377,8 +377,8 @@ class InfluxDBServices:
                 from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
-                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
-                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
+                |> keep(columns: ["device_id", "observed_property", "source", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "source", "_field"])
                 |> max()
                 """,
 
@@ -386,8 +386,8 @@ class InfluxDBServices:
                 from(bucket: "{self.buckets['RAW']}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r["batch_id"] == "{experiment_ID}")
-                |> keep(columns: ["device_id", "observed_property", "data_phase", "_field", "_value"])
-                |> group(columns: ["device_id", "observed_property", "data_phase", "_field"])
+                |> keep(columns: ["device_id", "observed_property", "source", "_field", "_value"])
+                |> group(columns: ["device_id", "observed_property", "source", "_field"])
                 |> min()
                 """
             }
@@ -399,11 +399,11 @@ class InfluxDBServices:
                     for record in table.records:
                         variable_name = record.values.get("observed_property", "N/A")
                         unit = self.unit_mapping.get(variable_name, "N/A")
-                        data_key = (record.values.get("type", "N/A"), variable_name)
+                        data_key = (record.values.get("source", "N/A"), variable_name)
                         
                         if data_key not in data:
                             data[data_key] = {
-                                "Type": record.values.get("type", "N/A"),
+                                "Type": record.values.get("source", "N/A"),
                                 "Name": variable_name,
                                 "Unit": unit,
                                 "Mean": "N/A",

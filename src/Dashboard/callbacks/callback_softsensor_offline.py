@@ -2,7 +2,6 @@ import dash
 from dash import Input, Output, State, html,ALL,ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
-from dash.exceptions import PreventUpdate
 from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 from Dashboard.utils.utils_global import disabled_figure
@@ -11,7 +10,6 @@ from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import json
 
 # Control start prediction
 inicio_pred = 0

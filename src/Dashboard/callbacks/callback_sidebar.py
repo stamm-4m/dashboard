@@ -1,7 +1,6 @@
 import dash
-from dash import Input, Output, html, State
+from dash import Input, Output, State
 from Dashboard.layouts.auth_layout import login_form 
-from Dashboard.layouts.main_layout import layout 
 from Dashboard.pages.data_source import data_source_layout
 from Dashboard.pages.softsensors import softsensors_layout
 from Dashboard.pages.data_drift import data_drift_layout
