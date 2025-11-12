@@ -1,11 +1,9 @@
 import os
-from dash import Input, Output, State, dcc, ALL, ctx, html,no_update
-from dash import callback_context
+from dash import Input, Output, State, dcc, ALL, ctx, html
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash
 import pandas as pd
-import numpy as np
 import re
 import plotly.graph_objects as go
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
