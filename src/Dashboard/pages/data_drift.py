@@ -117,7 +117,7 @@ def data_drift_layout():
                             ],
                          
                         )
-                    ], start_collapsed=True, flush=False)
+                    ], start_collapsed=False, flush=False)
                 ])
             ], width=12)
         ])

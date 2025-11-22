@@ -417,7 +417,10 @@ class InfluxDBServices:
                             value = round(value, 4)
 
                         data[data_key][key.capitalize()] = value
-            
+            data = {
+                k: v for k, v in data.items()
+                if v.get("Name") != "experiment_time"
+            }
             return list(data.values())
 
         except Exception as e:

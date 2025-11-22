@@ -150,32 +150,31 @@ class ModelInformation:
         #logger.debug(f"Model options generated: {options}")
         return options
 
-    # Function to load inputs from configuration
+        # Function to load inputs from configuration
     def load_inputs_from_configuration(self, model_name):
-        config = self.get_configuration_by_model_name(model_name)
-        #model_config = config.get('ml_model_configuration', {})
-        inputs = config['inputs'].get("features", [])
-        # Create options for the Dropdown
-        return [{"label": feature['name'], "value": feature['name']} for feature in inputs]
+        """
+        Load the list of input features from the model configuration.
 
-    """def load_yaml_file_monitoring(self, filepath):
-        "Loads a YAML file and adds it to the configurations list."
-        try:
-            with open(filepath, 'r', encoding="utf-8") as file:
-                config = yaml.safe_load(file)
-                self.configurations_monitoring.append(config)
-        except FileNotFoundError:
-            print(f"File not found: {filepath}")
-        except yaml.YAMLError as exc:
-            print(f"Error reading the YAML file: {exc}")"""
+        Parameters
+        ----------
+        model_name : str
+            Name of the model to retrieve configuration for.
 
-    """def load_multiple_yaml_files_monitoring(self, folder_path):
-        "Loads all YAML files from a folder."
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".yaml") or filename.endswith(".yml"):
-                filepath = os.path.join(folder_path, filename)
-                self.load_yaml_file_monitoring(filepath)"""
-    
+        Returns
+        -------
+        list[dict]
+            A list of dictionaries representing dropdown options. Each entry
+            includes a 'label' and a 'value' corresponding to a feature name.
+        """
+        config = self.get_configuration_by_model_name(model_name) or {}
+
+        # Safely extract features without raising errors
+        inputs_section = config.get("inputs", {})
+        features = inputs_section.get("features", [])
+
+        # Build dropdown options
+        return [{"label": f["name"], "value": f["name"]} for f in features]
+
     # Gets all unique categories from the 'type' field within inputs.
     def get_unique_types_models(self, model_name):
         for config in self.configurations:

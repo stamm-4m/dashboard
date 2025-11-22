@@ -38,8 +38,6 @@ def reset_performance_plot(n_clicks):
             df = pd.DataFrame()
             return disabled_figure, html.Div(), "","", df.to_dict("records"), df.columns,[0, 100] 
 
-           
-
 @dash.callback(
             Output("model-selected-display", "children"),
             Input("model-data-store", "data")
@@ -296,78 +294,92 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     Output("metrics-table", "data"),
     Output("metrics-table", "columns"),
     Output("metrics-table", "style_data_conditional"),
-    State("soft-sensor-input-estimator", "value"),  # ahora lista (multi-select)
-    State("store-selected-state", "data"),
-    State("model-data-store", "data"),
-    State("metrics-table", "data"),
-    Input("time-window-size", "value"),            # ✅ reemplaza dynamic-input
-    Input("performance-estimator-dropdown", "value"),
+    State("soft-sensor-input-estimator", "value"),     # list of selected models (multi-select)
+    State("store-selected-state", "data"),             # experiment state
+    State("model-data-store", "data"),                 # selected base model
+    State("metrics-table", "data"),                    # existing table data
+    Input("time-window-size", "value"),                # time window range
+    Input("performance-estimator-dropdown", "value"),  # selected metric
     prevent_initial_call=True
 )
 def update_metrics_table(models_selected, experiment_id, model_data_selected, existing_data, range_slider, metric_selected):
-    logger.debug(f"models_selected {models_selected}")
-    logger.debug(f"model_data_selected {model_data_selected}")
+    """
+    Update the metrics comparison table based on the selected models, time window, 
+    and performance metric.
+
+    This callback compares the base model with all selected models using the chosen 
+    metric (MAE, RMSE, MAPE, DTW, etc.). It reconstructs a matrix where each cell 
+    shows the metric value between model pairs.
+
+    Args:
+        models_selected (list[str]): Additional models selected by the user for comparison.
+        experiment_id (dict): Dictionary containing the selected experiment ID.
+        model_data_selected (dict): The base model information from the store.
+        existing_data (list[dict]): Current data in the metrics table.
+        range_slider (list[int]): Start and end indices of the time window.
+        metric_selected (str): Metric chosen from the dropdown.
+
+    Returns:
+        tuple: (updated table data, table columns, conditional styling rules)
+    """
     if not models_selected or not model_data_selected or not experiment_id or not range_slider or not metric_selected:
         return dash.no_update, dash.no_update, dash.no_update
     
     ctx = dash.callback_context
     triggered_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    
-    # ✅ Obtener datos
+
+    # Get experiment data
     df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_experiment"])
     if "_time" not in df_bach.columns:
         return dash.no_update, dash.no_update, dash.no_update
 
-    # Asegurar datetime
+    # Convert timestamp to datetime and sort
     df_bach["_time"] = pd.to_datetime(df_bach["_time"], utc=True).dt.tz_localize(None)
     df_bach = df_bach.sort_values("_time").reset_index(drop=True)
 
-    # Validar indices del slider
+    # Validate indices
     start_idx, end_idx = range_slider
     if start_idx < 0 or end_idx >= len(df_bach):
-        return dash.no_update, dash.no_update, dash._no_update
-    
-    df_window = df_bach.iloc[start_idx:end_idx+1]
+        return dash.no_update, dash.no_update, dash.no_update
+
+    df_window = df_bach.iloc[start_idx:end_idx + 1]
     if df_window.empty:
         return dash.no_update, dash.no_update, dash.no_update
 
-    # ✅ Reconstruir tabla si existe
+    # Reconstruct existing table
     if existing_data and len(existing_data) > 0:
         df_table = pd.DataFrame(existing_data).set_index("Model")
     else:
         df_table = pd.DataFrame()
 
-     # Loop sobre cada par de modelos seleccionados (incluyendo base)
+    # Full list: base model + others
     all_models = [model_data_selected["model_id"]] + models_selected
 
     for i, model_i in enumerate(all_models):
-
         pred_i = model_i.lower()
 
         for j, model_j in enumerate(all_models):
-            if i >= j:  # evitar duplicados y diagonal (se llenan simétricamente)
-                continue
-
+            if i >= j:
+                continue  # skip lower triangle and diagonal
             pred_j = model_j.lower()
 
-            # Validar columnas
+            # Check columns
             if pred_i not in df_window.columns or pred_j not in df_window.columns:
                 continue
 
-            # Datos válidos
+            # Compute metric using valid rows
             df_valid = pd.DataFrame({"y_true": df_window[pred_i], "y_pred": df_window[pred_j]}).dropna()
             if df_valid.empty:
                 continue
 
-            # Calcular métrica
             result = compute_metric(metric_selected, df_valid["y_true"], df_valid["y_pred"])
             result = round(result, 4)
 
-            # Crear tabla si está vacía
+            # Create table if empty
             if df_table.empty:
                 df_table = pd.DataFrame()
 
-            # Asegurar filas/columnas
+            # Ensure rows/columns
             for m in [model_i, model_j]:
                 if m not in df_table.columns:
                     df_table[m] = None
@@ -375,29 +387,44 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
                     new_row = {col: None for col in df_table.columns}
                     df_table.loc[m] = new_row
 
-            # Diagonal como NaN
+            # Fill diagonal with empty values
             for m in df_table.index:
-                df_table.loc[m, m] = "NaN"
+                df_table.loc[m, m] = ""
 
-            # Guardar métrica en posiciones simétricas
+            # Fill symmetric cells
             df_table.loc[model_i, model_j] = result
             df_table.loc[model_j, model_i] = result
 
-    # Reset index para DataTable
+    # Output table formatting
     if not df_table.empty:
-        base_name = model_data_selected["model_id"]  # ✅ siempre el modelo base en (0,0)
-        df_table, columns = reorder_dataframe_for_table(df_table,model_data_selected)
-        # Estilo dinámico: poner en negrita la fila del modelo base
+        base_name = model_data_selected["model_id"]
+        df_table, columns = reorder_dataframe_for_table(df_table, model_data_selected)
+
+        # Style rules
         style_data_conditional = [
             {
                 "if": {"filter_query": f'{{Model}} = "{base_name}"'},
                 "fontWeight": "bold"
             }
         ]
+
+        # Dark out diagonal cells
+        for col in df_table.columns:
+            if col != "Model":
+                style_data_conditional.append(
+                    {
+                        "if": {
+                            "column_id": col,
+                            "filter_query": f'{{{col}}} = ""'
+                        },
+                        "backgroundColor": "#030303"
+                    }
+                )
+
+        columns = [{"name": c, "id": c} for c in df_table.columns]
         return df_table.to_dict("records"), columns, style_data_conditional
 
     return dash.no_update, dash.no_update, dash.no_update
-
 
 @dash.callback(
     Output("time-ws-slider-labels", "children"),

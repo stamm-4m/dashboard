@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import logging
+import json
 from Dashboard.utils import model_information
 from Dashboard.utils.utils_data_drift import get_result_metric,get_detector_description
 from Dashboard.utils.utils_sofsensors_offline import reload_models
@@ -71,7 +72,7 @@ def update_metrics_section(selected_metric, selected_model):
                         dbc.Row([
                             dbc.Col(
                                 html.Label("Variable"),
-                                width=6,
+                                width=4,
                                 className="d-flex align-items-center"
                             ),
                             dbc.Col(
@@ -82,7 +83,7 @@ def update_metrics_section(selected_metric, selected_model):
                                     placeholder="Select Input Model",
                                     style={'width': '100%'}
                                 ),
-                                width=6
+                                width=8
                             )
                         ], className="mb-2")
                     ]
@@ -99,7 +100,7 @@ def update_metrics_section(selected_metric, selected_model):
                                         param_data.get('description', 'No description available'),
                                         target=f"tooltip-{selected_metric.strip()}-{param_name}"
                                     )
-                                ]), width=6, className="d-flex align-items-center"
+                                ]), width=4, className="d-flex align-items-center"
                             ),
                             dbc.Col(
                                 dcc.Input(
@@ -112,20 +113,20 @@ def update_metrics_section(selected_metric, selected_model):
                                     value=param_data.get('default', ''),
                                     className="mb-2",
                                     style={'width': '100%'}
-                                ), width=6
+                                ), width=8
                             )
                         ], className="mb-2")
                         for param_name, param_data in method_params.items()
                     ]
-                ], width=6),
+                ], width=5),
 
                 # Right column: Description and thresholds well distributed
                 dbc.Col([
-                    html.H6("Metric Description", className="mb-3"),
-                    dbc.ListGroup([
-                        dbc.ListGroupItem(f"{key}: {value}") for key, value in metric_info.get("thresholds", {}).items()
-                    ])
-                ], width=6),
+                    dbc.Row(
+                        [
+                        ],id="metrics-result"
+                        )
+                ], width=7),
             ])
         ])
     ], className="mb-3 shadow-sm")
@@ -303,23 +304,72 @@ def process_dynamic_inputs(values, ids, pathname):
 def render_dynamic_result(result, index=None):
     """
     Render any result object (dict-like) in a stylized Dash card.
+    Adds human-readable explanation for ADWIN drift detector outputs.
     """
+
     # Convert to dictionary if needed
     if hasattr(result, "__dict__"):
         result_dict = result.__dict__
     elif isinstance(result, dict):
         result_dict = result
     else:
-        #raise ValueError("Unsupported result type")
         return html.Pre(str(result))
 
-    # Check for 'drift' key to style the card
+    # ------------------------------------------------------------------
+    # Detect main drift flag
+    # ------------------------------------------------------------------
     drift_value = result_dict.get("drift", False)
-    color = "success" if drift_value else "danger"
     title = "Drift Detected ✅" if drift_value else "No Drift ❌"
-
     card_header = f"Result {index + 1}" if index is not None else "Drift Result"
 
+    # ------------------------------------------------------------------
+    # Build human-readable explanation
+    # ------------------------------------------------------------------
+    explanation_items = []
+
+    # (1) drift
+    if drift_value:
+        explanation_items.append("ADWIN detected a real change in the data.")
+    else:
+        explanation_items.append("ADWIN found no change in the data.")
+
+    color = "success" if drift_value else "danger"
+    # (2) last_index
+    li = result_dict.get("last_index", -1)
+    if li >= 0:
+        explanation_items.append(f"The drift was detected at position {li} in the stream.")
+    else:
+        explanation_items.append("No drift location was detected in the stream.")
+
+    # (3) details → delta + mode (in an indented block)
+    details_dict = result_dict.get("details", {})
+    if isinstance(details_dict, dict):
+        explanation_items.append(
+            html.Div([
+                "Used parameters:",
+                html.Pre(
+                    (
+                        ("    delta: This is a sensitivity parameter.\n" if "delta" in details_dict else "")
+                        +
+                        ("    mode: It was running in online mode." if "mode" in details_dict else "")
+                    )
+                )
+            ])
+        )
+
+    # Convert explanation list to HTML
+    explanation_block = html.Div(
+        [
+            html.Ul([
+                html.Li(item) if isinstance(item, str) else html.Li(item)
+                for item in explanation_items
+            ])
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # Render the raw key/value dictionary
+    # ------------------------------------------------------------------
     def render_key_value(key, value):
         if isinstance(value, dict):
             return html.Li(children=[
@@ -329,16 +379,34 @@ def render_dynamic_result(result, index=None):
         else:
             return html.Li(f"{key}: {value}")
 
-    return dbc.Card(
-        [
-            dbc.CardHeader(card_header),
-            dbc.CardBody([
-                html.H5(title, className=f"text-{color}"),
-                html.Ul([render_key_value(k, v) for k, v in result_dict.items()])
-            ])
-        ],
-        className=f"border-{color} mb-3"
+    return (
+        dbc.Col(
+            dbc.Card(
+                [
+                    dbc.CardHeader(html.H6("Explanation")),
+                    dbc.CardBody([explanation_block])
+                ],
+                className=f"border-{color} mb-3"
+            ),
+            width=7,className="align-items-center"
+        ),
+        dbc.Col(
+            dbc.Card(
+                [
+                    dbc.CardHeader(html.H6(card_header)),
+                    dbc.CardBody(
+                        [
+                            html.H5(title, className=f"text-{color}"),
+                            html.Ul([render_key_value(k, v) for k, v in result_dict.items()])
+                        ]
+                    )
+                ],
+                className=f"border-{color} mb-3"
+            ),
+            width=5, className="align-items-center"
+        )
     )
+
 
 def has_empty_values(params: dict) -> bool:
     """
