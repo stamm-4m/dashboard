@@ -77,3 +77,10 @@
 .dash-spreadsheet-menu {
     display: none !important;
 }
+.logo-slider {
+    height: 300px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: auto;
+}

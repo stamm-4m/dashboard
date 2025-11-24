@@ -6,7 +6,6 @@ def sidebar(session_data = None):
     is_authenticated = session_data and session_data.get("authenticated")
 
     return html.Div([
-        html.H2("STAMM", className="fw-bold text-center"),
         dcc.Store(id="store-selected-state", storage_type="local"),
         dcc.Store(id='model-data-store', storage_type='local'),
         dcc.Store(id="previous-model", storage_type="local"),
@@ -23,6 +22,10 @@ def sidebar(session_data = None):
 
 
         html.Hr(),
+        html.Img(
+            src="/assets/logo-white.png",
+            className="logo-slider"
+        ),
         html.P(
             "Soft sensor moniToring and mAintenance framework for Machine learning Models.", className="text-center"
         ),

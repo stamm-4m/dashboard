@@ -36,7 +36,7 @@ def data_source_layout():
                     dbc.Label("Please choose an Experiment ID to load the available models:", className="fw-bold"),
                     dcc.Dropdown(
                         id="experiment-dropdown",
-                        placeholder="Select Experiment ID",
+                        placeholder="Experiment Data Browser",
                         className="mb-3",
                         options=[],
                         persistence=True,
@@ -70,7 +70,7 @@ def data_source_layout():
                         page_size=10,
                     ),
 
-                    html.H5("Time Unit for 'Last Measurement'", className="text-left mt-4"),
+                    html.H5("Time Unit for 'Recent Measurements'", className="text-left mt-4"),
                     html.Div([
                     # Tabla Experimentos Online
                     dbc.Input(
@@ -100,7 +100,7 @@ def data_source_layout():
                     ], className="mb-4"),
 
                     # Data by experiment
-                    html.H5("Valid Data Points Over Time"),
+                    html.H5("Data Point Distribution"),
                     dbc.Label("Range selection"),
                     html.Br(),
                     dcc.DatePickerRange(
