@@ -258,10 +258,26 @@ def build_figure_with_traces(data_prediction, selected_variables, name_predictio
             'title': y_axis_labels[axis],
             'title_font': dict(color=color),
             'side': 'left' if i == 1 else 'right',
-            'position': 1 - (0.10 * (i - 2)) if i > 1 else None,
+            #'position': 1 - (1.10 * (i - 2)) if i > 1 else None,
             'overlaying': 'y' if i > 1 else None,
             'tickfont': dict(color=color)
         }
+          # Keep your logic, but ensure valid positions
+        if i == 1:
+            layout_yaxes[axis]['position'] = None
+
+        elif i == 2:
+            layout_yaxes[axis]['position'] = 1   # second axis at right edge
+
+        else:
+            layout_yaxes[axis]['position'] = 1
+            layout_yaxes[axis]['anchor'] = 'free'
+            # push the title and ticks further out progressively (pixels)
+            layout_yaxes[axis]['title_standoff'] = 30 * (i - 1)
+            layout_yaxes[axis]['ticklabelposition'] = 'outside'
+            layout_yaxes[axis]['ticklabeloffset'] = 20 * (i - 1)
+            layout_yaxes[axis]['ticklen'] = 6
+            layout_yaxes[axis]['automargin'] = True
 
     layout_update = {f'yaxis{i}': layout_yaxes.get(f'y{i}', {}) for i in range(1, len(y_axes) + 1)}
 
@@ -296,7 +312,7 @@ def build_figure_with_traces(data_prediction, selected_variables, name_predictio
             type="date"
         )
     )
-
+    fig.update_layout(margin=dict(r=200))
     return fig
 
 def update_xaxis_range(fig, relayout_data, data_prediction):

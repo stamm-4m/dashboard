@@ -17,7 +17,7 @@ def data_drift_layout():
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
-                            html.Label("Monitoring soft sensor:"),
+                            html.Label("Monitoring soft sensor:",className="fw-bold"),
                             dcc.Loading(
                                 id="loading-models-soft",
                                 type="circle",
@@ -35,7 +35,7 @@ def data_drift_layout():
                         ], width=6),
 
                         dbc.Col([
-                            html.Label("Drift detector:"),
+                            html.Label("Drift detector:",className="fw-bold"),
                             dcc.Dropdown(
                                 id='metric-score-dropdown',
                                 options=metrics_score_options,
@@ -49,19 +49,13 @@ def data_drift_layout():
                     ]),
                     dbc.Row([
                         dbc.Col([
-                            html.Label("Experiment ID:"),
-                            dcc.Dropdown(
-                                id='input-experiment-dropdown',
-                                    options=experiments_id,
-                                    className='mb-2',
-                                    searchable=True,
-                                    placeholder="Select experiment ID",
-                                    style={'width': '100%'}
-                                ),
+                            html.Label("Experiment ID:",className="fw-bold"),
+                            html.P(id='input-experiment-dropdown', className="mb-2")
                         ], width=6),
+
                         dbc.Col([
                             # Time range
-                            dbc.Label("Time range selection:"),
+                            dbc.Label("Time range selection:",className="fw-bold"),
                             dcc.RangeSlider(
                                 id="time-window-size-drift",
                                 min=0,

@@ -168,10 +168,10 @@ def get_performance_estimators_options():
 
     try:
         # Extract the list of performance estimators
-        drift_detectors = metric_load.get('performance_estimators', [])
+        performance_estimators = metric_load.get('performance_estimators', [])
         
-        if isinstance(drift_detectors, list):
-            for detector in drift_detectors:
+        if isinstance(performance_estimators, list):
+            for detector in performance_estimators:
                 name = detector.get('name')
                 acronym = detector.get('acronym')
                 if name and acronym:  # Ensure both values exist
@@ -181,7 +181,7 @@ def get_performance_estimators_options():
         return []
 
     # Convert unique values into a list of dictionaries
-    return [{"label": acronym, "value": acronym} for _, acronym in sorted(estimators)]
+    return [{"label": f"{acronym} - {name}", "value": acronym} for name, acronym in sorted(estimators)]
 
 def load_estimator_descriptions(selected_estimator):
         global metric_load

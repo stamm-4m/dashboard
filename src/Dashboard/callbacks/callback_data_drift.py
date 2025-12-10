@@ -139,7 +139,7 @@ def update_metrics_section(selected_metric, selected_model):
     Output("metrics-result", "children"),
     Input("add-metric-button", "n_clicks"),
     State("soft-sensor-input", "value"),
-    State("input-experiment-dropdown", "value"),
+    State("input-experiment-dropdown", "children"),
     State("input-model-dropdown", "value"),
     State("metric-score-dropdown", "value"),
     Input("store-metric-params", "data"),
@@ -202,7 +202,7 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
             opacity=0.5, marker=dict(color='red')
         ))
         fig.update_layout(
-            title=f"Density of Training and Test Sets Histogram ({selected_input})",
+            title=f"Density of training set and Experiment ID {experiment_id} - Variable ({selected_input})",
             xaxis_title=selected_input,
             yaxis_title="Density",
             barmode="overlay",
@@ -231,14 +231,14 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
         ))
 
         # Test KDE
-        test_x, test_y = safe_kde(test_data, "red", "Test Set")
+        test_x, test_y = safe_kde(test_data, "red", f"Experiment ID: {experiment_id}")
         fig2.add_trace(go.Scatter(
-            x=test_x, y=test_y, mode='lines', name='Test Set',
+            x=test_x, y=test_y, mode='lines', name=f"Experiment ID: {experiment_id}",
             fill='tozeroy', line=dict(color='red', width=2), opacity=0.5
         ))
 
         fig2.update_layout(
-            title=f"Density of Training and Test Sets ({selected_input})",
+            title=f"Density of training set and Experiment ID: {experiment_id} - Variable: {selected_input}",
             xaxis_title=selected_input,
             yaxis_title="Density",
             template="plotly_white"
@@ -498,7 +498,7 @@ def update_size_slider_labels(data, slider_range):
     return "", 0
 
 @dash.callback(
-    Output("input-experiment-dropdown", "value"),
+    Output("input-experiment-dropdown", "children"),
     Input("store-selected-state", "data"),
     prevent_initial_call=False 
 )

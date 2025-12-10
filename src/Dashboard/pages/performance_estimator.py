@@ -21,21 +21,21 @@ def performance_estimator_layout():
                             # Display experiment-id and model-selected-display
                             dbc.Col([
                                 html.Div([
-                                    html.Label("Deployed model:"),
+                                    html.Label("Deployed model:",className="fw-bold"),
                                     html.Br(),
                                     html.Label(id="model-selected-display"),
                                 ]
                                 ),
                                 html.Br(),
                                 html.Div([
-                                    html.Label("Selected experiment:"),                                        
+                                    html.Label("Selected experiment:",className="fw-bold"),                                        
                                     html.Br(),
                                     html.Label(id="experiment-id-display")
                                 ])
                             ]),   
 
                             dbc.Col([
-                                html.Label("Monitoring soft sensor:"),
+                                html.Label("Monitoring soft sensor:",className="fw-bold"),
                                 dcc.Loading(
                                         id="loading-models",
                                         type="circle",
@@ -50,7 +50,7 @@ def performance_estimator_layout():
                                     style={'width': '100%', 'whiteSpace': 'normal'}
                                 )),
                                 # Time range
-                                dbc.Label("Time range selection:"),
+                                dbc.Label("Time range selection:",className="fw-bold"),
                                 dcc.RangeSlider(
                                     id="time-window-size",
                                     min=0,
