@@ -256,7 +256,7 @@ class InfluxDBServices:
             logger.error(f"Error retrieving data until latest for batch_id {batch_id}: {e}")
             return pd.DataFrame()
 
-    def get_distinct_experiment_ids(self, time_range="0"):
+    def get_distinct_experiment_ids(self, project_name="", time_range="0"):
         """
         Retrieves a unique list of experiment_ID from the specified bucket in InfluxDB.
 
@@ -267,11 +267,14 @@ class InfluxDBServices:
         Returns:
             list: Unique list of experiment_ID.
         """
+        filter_project = f'|> filter(fn: (r) => r["project_name"] == "{project_name}")' if project_name else ""
+
         try:
             # Query to retrieve unique experiment_ID
             query = f"""
             from(bucket: "{self.buckets["RAW"]}")
             |> range(start: {time_range})
+            {filter_project}
             |> filter(fn: (r) => exists r["{str(INFLUXDB_BATCH_ID)}"])
             |> keep(columns: ["{str(INFLUXDB_BATCH_ID)}"])
             |> distinct(column: "{str(INFLUXDB_BATCH_ID)}")

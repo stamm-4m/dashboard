@@ -8,6 +8,4 @@ services:
       - "8050:8050"
     env_file:
       - .env
-    volumes:
-      - ./src:/app/src
     restart: unless-stopped

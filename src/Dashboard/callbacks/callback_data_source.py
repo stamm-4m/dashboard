@@ -1,8 +1,8 @@
 import dash
-from dash import Input, Output, State, html
+from dash import Input, Output, State, html, ctx, no_update
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.utils import model_information
+from Dashboard.utils.utils_model_information import get_model_information,list_projects
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import format_variable_name, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
@@ -14,35 +14,35 @@ from datetime import date, datetime, timezone
 logger = logging.getLogger(__name__)
 
 @dash.callback(
-    Output("experiment-dropdown", "value"),
     Output("store-selected-state", "data"),
-    Input("experiment-dropdown", "value"),   
+    Input("project-dropdown", "value"),
+    Input("experiment-dropdown", "value"),
     State("store-selected-state", "data"),
     prevent_initial_call=True
 )
-def sync_dropdown_and_store(dropdown_value, store_data):
-    # Caso 1: si el dropdown está vacío pero hay algo guardado en el store → restaurar
-    if (not dropdown_value) and store_data and "selected_experiment" in store_data:
-        return store_data["selected_experiment"], store_data
+def save_to_store(project_value, experiment_value, store_data):
 
-    # Caso 2: si el usuario selecciona algo nuevo → guardar en el store
-    if dropdown_value:
-        store_data = store_data or {}
-        store_data["selected_experiment"] = dropdown_value
-        return dropdown_value, store_data
+    store_data = store_data or {}
 
-    # Si nada aplica → no cambiar nada
-    return dash.no_update, dash.no_update
+    if project_value is not None:
+        store_data["selected_project"] = project_value
 
-    
+    if experiment_value is not None:
+        store_data["selected_experiment"] = experiment_value
+
+    return store_data
+
 @dash.callback(
-    [Output("experiment-dropdown", "options")],
-    [Input("url", "pathname")]
+    [Output("experiment-dropdown", "options"),
+     Output("experiment-dropdown", "value")],
+    [Input("url", "pathname"),
+     Input("project-dropdown", "name"),
+     State("store-selected-state", "data")],
 )
-def update_dropdowns(pathname):
+def update_dropdowns(pathname, selected_project, store_data):
     """Load experiment options ordered by most recent timestamp first."""
     try:
-        exp_all = influxdb_handler.get_distinct_experiment_ids()
+        exp_all = influxdb_handler.get_distinct_experiment_ids(project_name=selected_project)
         logger.debug(f"Experiments ID: {exp_all}")
 
         now = datetime.now(timezone.utc)
@@ -72,8 +72,13 @@ def update_dropdowns(pathname):
                 label = f"{exp} - more than 3 months ago"
 
             experiment_options.append({"label": label, "value": exp})
+        
+        selected_value = None
+        if store_data:
+            selected_value = store_data.get("selected_experiment")
+        
 
-        return [experiment_options]
+        return [experiment_options, selected_value]
 
     except Exception as e:
         logger.error(f"Error updating dropdowns: {e}")
@@ -125,17 +130,40 @@ def update_table_data(experiment_id):
         logger.error(f"Error updating table data: {e}")
         return [], html.H4("Error loading experiment data")
 
+# Callback to load option dropdown for projects
+@dash.callback(
+    Output("project-dropdown", "options"),  
+    Output("project-dropdown", "value"),
+    Input("url", "pathname"),
+    State("store-selected-state", "data")
+)
+def load_project_options(pathname, store_data):
+    """Load project options from the API."""
+    try:
+        projects = list_projects()
+        logger.debug(f"Projects: {projects}")
+        options = [{"label": proj["name"], "value": proj["id"]} for proj in projects]
+
+        selected_value = None
+        if store_data:
+            selected_value = store_data.get("selected_project")
+        return options, selected_value
+    except Exception as e:
+        logger.error(f"Error loading project options: {e}")
+        return []
+
 @dash.callback(
     Output('project-details', 'children'),
     Output("project-name", "children"),
-    Input("experiment-dropdown", "value")
+    Input("project-dropdown", "value"),
+    prevent_initial_call=True
 )
 def display_project_details(value):
     """
-    Update project information and name based on the selected experiment.
+    Update project information and name based on the selected project.
 
     This callback is triggered when the user selects a value from the
-    `experiment-dropdown`. It retrieves the project details using
+    `project-dropdown`. It retrieves the project details using
     `model_information.project_details()`, constructs a formatted display
     for the project information, and updates both the project detail
     section and the project name header.
@@ -143,7 +171,7 @@ def display_project_details(value):
     Parameters
     ----------
     value : str
-        The selected experiment identifier from the dropdown input.
+        The selected project identifier from the dropdown input.
 
     Returns
     -------
@@ -152,7 +180,12 @@ def display_project_details(value):
         - dash.html.Component : A formatted HTML view with project details.
         - str : A string representing the project name header.
     """
-    data_info = model_information.project_details()
+    logger.debug(f"Selected project ID: {value}")
+    if not value:
+        return html.P("No project selected"), "Project name: N/A"
+    
+    model_information = get_model_information(value)  # Cache the project information for faster access
+    data_info = model_information.project_details(value)
 
     if data_info:
         name = f"Project name: {data_info.get('project_name',{})}"

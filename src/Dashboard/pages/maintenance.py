@@ -3,7 +3,7 @@ from dash import html, dcc, dash_table
 import dash_bootstrap_components as dbc
 from dash_extensions import EventListener
 from Dashboard.utils.utils_global import disabled_figure
-from Dashboard.utils import model_information
+from Dashboard.utils.utils_model_information import get_model_information
 
 style_data_conditional=[
     {
@@ -18,11 +18,12 @@ style_data_conditional=[
     },
 ]
 
-def maintenance_layout():
-
-    # Load model options dynamically for layout
-    model_name_options = model_information.get_model_name_options()
-
+def maintenance_layout(store_data=None):
+    model_name_options = []
+    if store_data:
+        # Load model options dynamically for layout
+        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
+        model_name_options = model_information.get_model_name_options()
     
     # Return only the content specific to the maintenance page
     return html.Div([

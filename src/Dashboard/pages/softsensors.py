@@ -1,11 +1,9 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from Dashboard.utils import model_information
 from Dashboard.utils.utils_global import disabled_figure
 
 
 def softsensors_layout():
-        model_name_options = model_information.get_model_name_options()
         
         return html.Div([
             # Title

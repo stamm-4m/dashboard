@@ -9,10 +9,11 @@ import plotly.graph_objects as go
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 import io
 import sqlite3
-from Dashboard.utils import model_information,sqlite_handler
+from Dashboard.utils import sqlite_handler
 import plotly.express as px
-from Dashboard.config import DB_ENGINE, BASE_URL_API, INFLUXDB_BUCKET
+from Dashboard.config import DB_ENGINE, BASE_URL_API, INFLUXDB_BUCKET_RAW
 import logging
+from Dashboard.utils.utils_model_information import get_model_information
 
 logger = logging.getLogger(__name__) 
 
@@ -38,7 +39,7 @@ def update_model_display(data):
     """
     # Check if the model data exists and contains a valid model name
     if not data or "model_name" not in data or not data["model_name"]:
-        model_options = model_information.get_model_name_options()
+        logger.warning("No model name found in data.")
         return "No selected model"
 
     # Return the model name as a formatted string
@@ -46,9 +47,10 @@ def update_model_display(data):
 
 @dash.callback(
     Output('model-selector-maintenance', 'options'),
-    Input('model-selector-maintenance', 'n_clicks')
+    Input('model-selector-maintenance', 'n_clicks'),
+    State("store-selected-state", "data"),
 )
-def update_model_options(n_clicks):
+def update_model_options(n_clicks, store_data):
     """
     Updates the list of available models in the model selector.
 
@@ -62,13 +64,14 @@ def update_model_options(n_clicks):
         list: A list of dictionaries representing model options for the selector.
     """
     # Reload all available models
-    reload_models()
-
+    reload_models(store_data.get("selected_project"))  # Pass the project
+    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     # Retrieve and return updated model names for the dropdown options
     return model_information.get_model_name_options()
 
 # Calls the function again to read  'Models
-def reload_models():
+def reload_models(project_id):
+    model_information = get_model_information(project_id)
     model_information.configurations = []
     model_information.load_all_models()
 
@@ -135,9 +138,10 @@ def confirm_maintenance(n_clicks, reason):
 @dash.callback(
     Output('type-selector-maintenance', 'options'),
     Input('model-selector-maintenance', 'value'),
+    State("store-selected-state", "data"),
     prevent_initial_call=True
 )
-def update_model_types_maintenance(name):
+def update_model_types_maintenance(name, store_data):
     """
     Updates the available model type options based on the selected model name.
 
@@ -152,6 +156,7 @@ def update_model_types_maintenance(name):
         no types are found for the given model.
     """
     # Retrieve unique model types based on the selected model name
+    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     types_variable = model_information.get_unique_types_models(name)
     
     # Log a debug message and return an empty list if no types are found
@@ -165,9 +170,10 @@ def update_model_types_maintenance(name):
 @dash.callback(
     Output('name-selector-maintenance', 'options'),
     Input('type-selector-maintenance', 'value'),
-    Input('model-selector-maintenance', 'value')
+    Input('model-selector-maintenance', 'value'),
+    State("store-selected-state", "data"),
 )
-def update_name_selector(selected_category, model_name):
+def update_name_selector(selected_category, model_name, store_data):
     """
     Updates the options for the 'name-selector-maintenance' dropdown 
     based on the selected category and model name.
@@ -186,6 +192,7 @@ def update_name_selector(selected_category, model_name):
     """
     if selected_category:
         # Retrieve names that correspond to the selected category and model
+        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
         logger.debug(f"name_variable: {model_information.get_names_by_category(selected_category, model_name)}")
         return model_information.get_names_by_category(selected_category, model_name)
     else:
@@ -827,7 +834,7 @@ def generate_excel_report(n_clicks, data, experiment_id, model_selected, time_ra
         "Selected variables": [", ".join([f"{v['variable_name']}" for v in selected_vars])],
         "Model metadata": [f"{BASE_URL_API}/metadata/{prediction_var.split('_')[-1]}"],
         "Database": [DB_ENGINE],
-        "Bucket": [INFLUXDB_BUCKET],
+        "Bucket": [INFLUXDB_BUCKET_RAW],
     }
     df_info = pd.DataFrame(info_dict)
 

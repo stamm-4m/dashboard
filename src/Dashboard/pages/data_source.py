@@ -3,8 +3,11 @@ import dash_bootstrap_components as dbc
 from datetime import date, timedelta
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_global import disabled_figure
+import logging
+logger = logging.getLogger(__name__)
 
-def data_source_layout():
+def data_source_layout(store_data=None):
+        
         
         example_data = [
             {"Type": "Sensor", "Name": "Temperature", "Unit": "°C", "Mean": "30", "Max": "40", "Min": "20"},
@@ -21,6 +24,12 @@ def data_source_layout():
 
         time_units = ["seconds", "minutes", "hours", "days", "months"]
 
+        selected_project = None
+        selected_experiment = None
+        logger.debug(f"Received store data in layout: {store_data}")
+        if store_data:
+            selected_project = store_data.get("selected_project")
+            selected_experiment = store_data.get("selected_experiment")
 
         return dbc.Container([
             dbc.Row([
@@ -33,11 +42,22 @@ def data_source_layout():
                         interval=5 * 1000,  # 5 segundos
                         n_intervals=0
                     ),
+                    dbc.Label("Please choose an Project to load available experiments:", className="fw-bold"),
+                    dcc.Dropdown(
+                        id="project-dropdown",
+                        placeholder="Project Data Browser",
+                        className="mb-3",
+                        value=selected_project,
+                        options=[],
+                        persistence=True,
+                        persistence_type="local"
+                    ),
                     dbc.Label("Please choose an Experiment ID to load the available models:", className="fw-bold"),
                     dcc.Dropdown(
                         id="experiment-dropdown",
                         placeholder="Experiment Data Browser",
                         className="mb-3",
+                        value=selected_experiment,
                         options=[],
                         persistence=True,
                         persistence_type="local"

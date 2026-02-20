@@ -1,6 +1,6 @@
 # STAMM Dashboard
 
-This repository provides an interactive **Dash-based web dashboard** for monitoring, analyzing, and visualizing machine learning model behavior in production.  
+This repository provides an interactive **Dash-based web dashboard** for monitoring, analyzing, and visualizing machine learning model behavior in production.
 
 It integrates with **InfluxDB** for time-series data and a **Model Repository API** for managing trained models.
 
@@ -8,16 +8,15 @@ It integrates with **InfluxDB** for time-series data and a **Model Repository AP
 
 ## ⚙️ Features
 
-- 📊 **Dash-based web interface** for interactive model and data monitoring.  
-- 📈 **InfluxDB integration** for real-time signal tracking.  
-- 🤖 **Model Repository API connection** for loading and managing ML models.  
-- 🔄 **Modular architecture**: drift detection and database connectors are modular subpackages.  
+- 📊 **Dash-based web interface** for interactive model and data monitoring.
+- 📈 **InfluxDB integration** for real-time signal tracking.
+- 🤖 **Model Repository API connection** for loading and managing ML models.
+- 🔄 **Modular architecture**: drift detection and database connectors are modular subpackages.
 - 🧩 **Poetry-based dependency management** for clean reproducibility.
 
 ---
 
 ## 🧰 Requirements
-
 
 - **Docker** and **Docker Compose** (recommended)
 - Or manually:
@@ -30,15 +29,18 @@ It integrates with **InfluxDB** for time-series data and a **Model Repository AP
 
 Follow the steps below to set up and run the **STAMM Dashboard**, an interactive monitoring interface built with Dash, InfluxDB, and the STAMM Model Repository API.
 
-
 ## 🧩 1. Clone repository
 
-Clone the project from GitLab and move into the project directory:
+Clone the project from GitLab with submodules and move into the project directory:
 
 ```bash
-git clone git@gitlab.com:stamm-4m/dashboard.git
+git clone --recurse-submodules git@gitlab.com:stamm-4m/dashboard.git
 cd dashboard
 ```
+
+If you I did clone remember to use:
+
+`git submodule update --init --recursive`
 
 ## 🔐 2. Environment Configuration
 
@@ -59,7 +61,6 @@ DB_ENGINE=influxdb
 INFLUXDB_URL=http://influxdb:8086
 INFLUXDB_TOKEN=my-secret-token
 INFLUXDB_ORG=my-org
-INFLUXDB_BUCKET=my-bucket
 
 # Data measeurement configuration 
 INFLUXDB_MEASUREMENT=bioreactor_obs
@@ -71,7 +72,6 @@ INFLUXDB_DEVICE_ID=my-device
 INFLUXDB_PROJECT_NAME=my-
 
 # Predefined buckets (⚠️ do not modify)
-INFLUXDB_BUCKET=STAMM_Bucket
 INFLUXDB_BUCKET_RAW=stamm_raw
 INFLUXDB_BUCKET_PREDICTIONS=stamm_predictions
 INFLUXDB_BUCKET_METADATA=stamm_metadata
@@ -92,12 +92,14 @@ BASE_URL_API = my-url-to-api
 # Associated project identifier
 PROJECT_ID=my-project-id 
 ```
+
 ⚠️ Security note:
 Never commit .env files to GitLab. Make sure .env is included in .gitignore.
 
 ## 🐳 3. Docker Setup
+
 Ensure that **Docker** and **Docker Compose** are installed and running on your system.
- 
+
 Install Docker Compose (if it’s not installed) and open it, making sure it’s running.
 
 [Install Docker](https://docs.docker.com/get-docker/)
@@ -106,6 +108,7 @@ Install Docker Compose (if it’s not installed) and open it, making sure it’s
 ](https://docs.docker.com/compose/install/)
 
 Once installed, verify your setup with:
+
 ```bash
 docker --version
 docker compose version
@@ -140,10 +143,10 @@ Once running, the Dashboard will automatically connect to the configured **Influ
 
 The executable file will start the Docker Compose, and when it’s ready, it will open http://localhost:8050/ where you can use STAMM.
 
-
 ## 🧠 Quick Debug Commands
 
 If you need to check container logs or troubleshoot:
+
 ```bash
 # List running containers
 docker ps
@@ -160,7 +163,7 @@ docker compose down
 
 # ⚙️ Direct Usage via Poetry
 
-You can also run **STAMM Dashboard** directly using [Poetry](https://python-poetry.org/), without Docker.  
+You can also run **STAMM Dashboard** directly using [Poetry](https://python-poetry.org/), without Docker.
 This method is ideal for **development**, **testing**, or **lightweight execution** environments.
 
 ## 📦 1. Install Poetry
@@ -170,7 +173,9 @@ If you don’t have Poetry installed yet, run the following command:
 ```bash
 pip install poetry
 ```
+
 You can verify the installation with:
+
 ```bash
 poetry --version
 ```
@@ -178,9 +183,11 @@ poetry --version
 ## 🧩 2. Install Project Dependencies
 
 Once Poetry is installed, install all required dependencies:
+
 ```bash
 poetry install
 ```
+
 This command will:
 
 -Create a virtual environment automatically.
@@ -188,6 +195,7 @@ This command will:
 -Install all dependencies defined in pyproject.toml.
 
 If you only want to install the main (non-dev) dependencies, use:
+
 ```bash
 poetry install --only main
 ```
@@ -197,13 +205,13 @@ poetry install --only main
 ```bash
 poetry run stamm -p 8081 -d
 ```
+
 `-p` indicates the port and `-d` activates debug mode.
 
 # 📫 Contact
 
 For questions, demo environments, or academic collaborations, please contact:
 
-Carlos Suárez - 🎓 Universidad del Cauca 
+Carlos Suárez - 🎓 Universidad del Cauca
 
 📧 csuarez@unicauca.edu.co
-

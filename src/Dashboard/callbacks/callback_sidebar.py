@@ -17,28 +17,29 @@ from Dashboard.pages.admin_panel import admin_panel_layout
 @dash.callback(
     Output("main-content", "children"),
     Input("url", "pathname"),
+    State("store-selected-state", "data"),
     State("user-session", "data"))
-def display_page(pathname, session_data):
+def display_page(pathname, store_data, session_data):
     if not session_data or not session_data.get("authenticated"):
         return login_form()
     if pathname == "/" or pathname == "/home":
         return home_layout()
     if pathname == "/data-source":
-        return data_source_layout()
+        return data_source_layout(store_data=store_data)
     elif pathname == "/soft-sensors":
         return softsensors_layout()
     elif pathname == "/soft-sensors/load-soft-sensor":
          return model_upload_layout()
     elif pathname == "/monitoring/data-drift":
-        return data_drift_layout()
+        return data_drift_layout(store_data=store_data)
     elif pathname == "/monitoring/performance":
-         return performance_estimator_layout()
+         return performance_estimator_layout(store_data=store_data)
     elif pathname == "/maintenance":
          return maintenance_layout()
     elif pathname == "/about-us":
          return about_us_layout()
     elif pathname == "/help":
-        return help_layout()
+        return help_layout(store_data=store_data)
     if pathname == "/admin":
         return admin_panel_layout()
     else:

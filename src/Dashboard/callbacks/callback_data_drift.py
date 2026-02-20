@@ -9,7 +9,7 @@ import pandas as pd
 import scipy.stats as stats
 import logging
 import json
-from Dashboard.utils import model_information
+from Dashboard.utils.utils_model_information import get_model_information
 from Dashboard.utils.utils_data_drift import get_result_metric,get_detector_description
 from Dashboard.utils.utils_sofsensors_offline import reload_models
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
@@ -21,10 +21,12 @@ UNIVARIABLE_METRICS = ["ADWIN","KS","PSI"]
 
 @dash.callback(
     Output('soft-sensor-input', 'options'),
-    Input('soft-sensor-input', 'n_clicks')
+    Input('soft-sensor-input', 'n_clicks'),
+    State("store-selected-state", "data"),
 )
-def reload_model_options(n_clicks):
-    reload_models()
+def reload_model_options(n_clicks, store_data):
+    reload_models(store_data.get("selected_project"))  # Pass the project ID to reload models
+    model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
     return model_information.get_model_name_options()
 
 # Load selected metrics
@@ -33,15 +35,17 @@ def reload_model_options(n_clicks):
     Output("graph-details", "style"),
     Input("metric-score-dropdown", "value"),
     State("soft-sensor-input", "value"),
+    State("store-selected-state", "data"),
     prevent_initial_call=True
 )
-def update_metrics_section(selected_metric, selected_model):
+def update_metrics_section(selected_metric, selected_model, store_data):
     logger.debug(f"selected_metric: {selected_metric}")
     if not selected_metric:
         return html.Div(),{"display": "none"}  # If no metric is selected, return an empty div,# If no model is selected, leave it empty
     
     model_options = [] # If no model is selected, leave it empty
     if selected_model:
+        model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
         model_options = model_information.load_inputs_from_configuration(selected_model)
     variable_show = {"display":"none"}
     graph_show = {"display":"none"}
@@ -144,9 +148,10 @@ def update_metrics_section(selected_metric, selected_model):
     State("metric-score-dropdown", "value"),
     Input("store-metric-params", "data"),
     Input("time-window-size-drift", "value"),
+    State("store-selected-state", "data"),
     prevent_initial_call=True
 )
-def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, metric_score, param_dinamic_values,range_slider):
+def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, metric_score, param_dinamic_values,range_slider, store_data):
     logger.debug(f"metric_score: {metric_score}")
     if not (soft_sensor and experiment_id):
         logger.warning("dash.no_update not soft sensor and experiment id")
@@ -161,6 +166,7 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
         return dash.no_update
 
     # 1. Retrieve data from the selected model's YAML
+    model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
     config = model_information.get_configuration_by_model_name(soft_sensor)  # Implement this function
     training_info = config["training_information"]
 

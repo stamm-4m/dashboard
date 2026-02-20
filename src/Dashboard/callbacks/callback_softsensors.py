@@ -2,8 +2,8 @@ import dash
 from dash import Input, Output, State, html, ALL, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
-from Dashboard.utils import model_information
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
+from Dashboard.utils.utils_model_information import get_model_information
 from Dashboard.utils.utils_sofsensors_offline import reload_models
 from Dashboard.utils.utils_softsensors import (create_toast,build_figure_with_traces,update_xaxis_range,
                                                     get_latest_index,build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels)
@@ -104,9 +104,10 @@ def update_table(add_click, remove_clicks, selected_variable, current_data):
 @dash.callback(
             Output('name-selector', 'options'),
             Input('type-selector', 'value'),
-            Input('model-selector', 'value')
+            Input('model-selector', 'value'),
+            State("store-selected-state", "data"),
         )
-def update_name_selector(selected_category,model_name):
+def update_name_selector(selected_category,model_name, data_store):
             """
             Update the options for the 'name-selector' dropdown based on the selected category.
 
@@ -117,6 +118,7 @@ def update_name_selector(selected_category,model_name):
                 list: A list of dictionaries with the options for the 'name-selector' dropdown.
             """
             if selected_category:
+                model_information = get_model_information(data_store.get("selected_project"))  # Get the updated model information
                 # Get names corresponding to the selected category
                 return model_information.get_names_by_category(selected_category,model_name)
             else:
@@ -127,10 +129,12 @@ def update_name_selector(selected_category,model_name):
 @dash.callback(
     Output('model-selector', 'options'),
     Output('model-selector', 'value'),
-    Input('model-data-store', 'data')
+    Input('model-data-store', 'data'),
+    State("store-selected-state", "data")
 )
-def update_model_options(data_store):
-    reload_models()
+def update_model_options(data_store, store_data):
+    reload_models(project_id=store_data.get("selected_project"))
+    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     options = model_information.get_model_name_options()
 
     selected_value = None
@@ -144,24 +148,28 @@ def update_model_options(data_store):
 @dash.callback(
             Output('type-selector', 'options'),
             Input('model-selector', 'value'),
+            State("store-selected-state", "data"),
             prevent_initial_call=True
         )
-def update_model_types(name):
-            #print("name",name)
+def update_model_types(name, store_data):
+            logger.debug(f"Updating type options for model: {name}")
+            logger.debug(f"Store data in update_model_types: {store_data}")
+            model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
             types_variable = model_information.get_unique_types_models(name)
-            #print("types_variable",types_variable)
             return types_variable 
 
 @dash.callback(
     [Output('model-details', 'children'),
      Output('model-data-store', 'data', allow_duplicate=True)],
     Input('model-selector', 'value'),
+    State("store-selected-state", "data"),
     prevent_initial_call=True
 )
-def display_model_details(selected_model):
+def display_model_details(selected_model, store_data):
     if not selected_model:
         return html.P("Select a model to show configuration.", style={'textAlign': 'center'}), {}
 
+    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     config = model_information.get_configuration_by_model_name_language(selected_model)
 
     if config:

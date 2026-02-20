@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import yaml
 import os
 import pandas as pd
@@ -10,10 +12,10 @@ logger = logging.getLogger(__name__)
 # Class to manage information from ML model files
 class ModelInformation:
 
-    def __init__(self):
+    def __init__(self, project_id=None):
         # Create instance for Client
         self.api_client = ApiClient(BASE_URL_API)
-        self.base_project_id = PROJECT_ID
+        self.base_project_id = project_id
         self.configurations = []
         self.configurations_monitoring = []
         
@@ -115,6 +117,7 @@ class ModelInformation:
 
     # Function to list unique options for model name
     def get_model_name_options(self):
+        logger.debug("Generating model name options for dropdown")
         """Returns a list of unique model name options for a Dash dropdown component."""
         # Use a set to collect unique model names
         unique_names = {
@@ -255,11 +258,11 @@ class ModelInformation:
                 print(f"Error processing get name input: {e}")
 
     
-    def project_details(self):
+    def project_details(self, project_id):
         """
         Retrieve detailed information about a specific project.
 
-        This method sends a GET request to the API endpoint `"{self.base_project_id}/project_info/"`
+        This method sends a GET request to the API endpoint `"{project_id}/project_info/"`
         using the provided project identifier. It returns the project details
         if the request is successful, otherwise logs an error message.
 
@@ -274,9 +277,43 @@ class ModelInformation:
         Exception
             If an unexpected error occurs during the API request.
         """
+        logger.debug(f"Fetching project details for project_id: {project_id}")
         try:
-            response = self.api_client.get(f"{self.base_project_id}/project_info/")
+            response = self.api_client.get(f"{project_id}/project_info/")
             return response
         except Exception as e:
             logger.error(f"Error getting project details data: {e}")
             return None
+        
+    
+def list_projects():
+        """
+        Retrieve a list of project names from the API.
+
+        This method sends a GET request to the API endpoint list_projects/
+        to fetch a list of projects. It extracts and returns the project names
+        from the response if the request is successful, otherwise logs an error message.
+
+        Returns
+        -------
+        list or None
+            A list of project names and project_ID if the request is successful.
+            Returns None if an error occurs during the API request.
+
+        Raises
+        ------
+        Exception
+            If an unexpected error occurs during the API request.
+        """
+        try:
+            api_client = ApiClient(BASE_URL_API)
+            response = api_client.get("list_projects/")
+            project_names = [{"name": project['name'], "id": project['project_ID']} for project in response]
+            return project_names
+        except Exception as e:
+            logger.error(f"Error getting project names: {e}")
+            return None
+        
+@lru_cache(maxsize=32)
+def get_model_information(project_id):
+    return ModelInformation(project_id)

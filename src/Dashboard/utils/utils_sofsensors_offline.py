@@ -2,12 +2,13 @@ import dash_bootstrap_components as dbc
 import requests
 import json
 import re
-from Dashboard.utils import model_information
-from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
+from Dashboard.InfluxDb import influxdb_handler
+from Dashboard.utils.utils_model_information import get_model_information  # Retrieve the created instance
 
 
 # Calls the function again to read  'Models
-def reload_models(): 
+def reload_models(project_id): 
+    model_information = get_model_information(project_id)
     model_information.configurations = []
     model_information.load_all_models()
 

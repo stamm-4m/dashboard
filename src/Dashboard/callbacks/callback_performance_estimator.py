@@ -6,7 +6,7 @@ import plotly.graph_objs as go
 import pandas as pd
 import logging
 from Dashboard.InfluxDb import influxdb_handler
-from Dashboard.utils import model_information
+from Dashboard.utils.utils_model_information import get_model_information
 from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models,load_estimator_descriptions,compute_metric,reorder_dataframe_for_table
 from Dashboard.utils.utils_global import disabled_figure
 
@@ -15,10 +15,13 @@ logger = logging.getLogger(__name__)
 # Function to update the options of the existing models
 @dash.callback(
             Output('soft-sensor-input-estimator', 'options'),
-            Input('soft-sensor-input-estimator', 'n_clicks')
+            Input('soft-sensor-input-estimator', 'n_clicks'),
+            State("store-selected-state", "data")
         )
-def update_model_options(n_clicks):
-    reload_models()
+def update_model_options(n_clicks, store_data ):
+    logger.debug(f"update_model_options called with store_data: {store_data}")
+    reload_models(project_id=store_data.get("selected_project"))  # Reload models to get the latest information
+    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     return model_information.get_model_id_options()
 
 @dash.callback(
@@ -59,11 +62,13 @@ def update_experiment_display(data):
 @dash.callback(
             Output('input-model-dropdown', 'options',allow_duplicate=True),
             Input('soft-sensor-input-estimator', 'value'),
+            State("store-selected-state", "data"),
             prevent_initial_call=True
 )
-def update_input_options(selected_model):
+def update_input_options(selected_model, store_data):
     
     if selected_model:
+        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
         return model_information.load_inputs_from_configuration(selected_model)
     return []  # If no model is selected, leave it empty
 

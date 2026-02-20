@@ -3,7 +3,8 @@ from dash import Input, Output, State, dcc, html
 import dash_bootstrap_components as dbc
 import random
 import os
-
+import logging
+logger = logging.getLogger(__name__)
 
 def about_us_layout():
         team_members = get_team_data()
@@ -134,11 +135,19 @@ def get_team_data():
         ]
 
         # Check if each image exists, else use the default image
+        from pathlib import Path
+
+        BASE_DIR = Path(__file__).resolve().parent
+        ASSETS_DIR = BASE_DIR.parent / "assets"
+
         for member in members:
-            image_path = os.path.join(assets_directory, member["image"])
-            if os.path.exists(image_path):
+            image_path = ASSETS_DIR / member["image"]
+
+            logger.debug(f"Checking image path: {image_path}")
+
+            if image_path.exists():
                 member["image"] = f"/assets/{member['image']}"
             else:
-                member["image"] = default_image  # Use the default profile image if not found
-
+                member["image"] = default_image
+        
         return members
