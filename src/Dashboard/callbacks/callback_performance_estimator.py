@@ -172,7 +172,7 @@ def update_performance_plot(n_clicks, models_selected, experiment_id, model_data
     base_pred_name = model_data_selected["model_id"].lower()   # base model
 
     # Data del experimento
-    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_project_name"], experiment_id["selected_experiment"])
 
     if "_time" not in df_bach.columns:
         logger.debug("⚠️ _time column missing in data")
@@ -334,7 +334,7 @@ def update_metrics_table(models_selected, experiment_id, model_data_selected, ex
     triggered_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
     # Get experiment data
-    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_experiment"])
+    df_bach = influxdb_handler.get_data_until_latest(experiment_id["selected_project_name"], experiment_id["selected_experiment"])
     if "_time" not in df_bach.columns:
         return dash.no_update, dash.no_update, dash.no_update
 

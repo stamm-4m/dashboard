@@ -241,7 +241,7 @@ def update_graph(data_model, store_data, n, relayout_data, data_prediction, sele
 
         #inicio_pred = get_latest_index(store_data['selected_experiment'])
         logger.debug(f"n_clicks : {n_clicks}")
-        dfc = influxdb_handler.get_data_until_latest(store_data['selected_experiment'])
+        dfc = influxdb_handler.get_data_until_latest(store_data['selected_project_name'], store_data['selected_experiment'])
         if dfc is None or dfc.empty:
             inicio_pred =  0
         

@@ -26,6 +26,12 @@ def save_to_store(project_value, experiment_value, store_data):
 
     if project_value is not None:
         store_data["selected_project"] = project_value
+        model_information = get_model_information(project_value)  # Cache the project information for faster access
+        data_info = model_information.project_details(project_value)
+        name = None
+        if data_info:
+            name = data_info.get('project_name',{})
+            store_data["selected_project_name"] = name
 
     if experiment_value is not None:
         store_data["selected_experiment"] = experiment_value
@@ -36,13 +42,16 @@ def save_to_store(project_value, experiment_value, store_data):
     [Output("experiment-dropdown", "options"),
      Output("experiment-dropdown", "value")],
     [Input("url", "pathname"),
-     Input("project-dropdown", "name"),
+     Input("project-dropdown", "value"),
      State("store-selected-state", "data")],
 )
 def update_dropdowns(pathname, selected_project, store_data):
     """Load experiment options ordered by most recent timestamp first."""
     try:
-        exp_all = influxdb_handler.get_distinct_experiment_ids(project_name=selected_project)
+        if not store_data or "selected_project_name" not in store_data:
+            return [[],None]
+        
+        exp_all = influxdb_handler.get_distinct_experiment_ids(project_name=store_data["selected_project_name"])
         logger.debug(f"Experiments ID: {exp_all}")
 
         now = datetime.now(timezone.utc)

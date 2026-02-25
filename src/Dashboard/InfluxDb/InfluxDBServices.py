@@ -1,12 +1,10 @@
-from Dashboard.config import  ( INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_PROJECT_NAME,INFLUXDB_BATCH_ID,
+from Dashboard.config import  ( INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG,INFLUXDB_BATCH_ID,
                                INFLUXDB_BUCKET_METADATA,INFLUXDB_BUCKET_PREDICTIONS,INFLUXDB_BUCKET_RAW,INFLUXDB_MEASUREMENT,
                                INFLUXDB_DEVICE_ID)
                             
 from Dashboard.db_connector.multi_db_connector.influxdb_connector import InfluxDBConnector
-from influxdb_client import Point, WritePrecision
-from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime, timedelta
-
+import re
 import pandas as pd
 import logging
 
@@ -128,6 +126,7 @@ class InfluxDBServices:
         Returns:
             pd.DataFrame: DataFrame with the data corresponding to the batch_id.
         """
+        logger.debug(f"batch_id : {batch_id}")
         try:
             # Validate batch_id
             if not batch_id:
@@ -145,7 +144,7 @@ class InfluxDBServices:
             |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(batch_id)}")
             """
 
-            #print("query", query)
+            logger.debug(f"query {query}")
 
             # Execute the query
             results = self.connector.query_api.query(query=query)
@@ -189,13 +188,14 @@ class InfluxDBServices:
             logger.error(f"Error retrieving data for batch_id {batch_id}: {e}")
             return pd.DataFrame()
     
-    def get_data_until_latest(self, batch_id):
+    def get_data_until_latest(self, project_name, batch_id):
         """
         Returns a DataFrame with one row per timestamp, containing:
         - Raw values for each observed property.
-        - A single predicted value column (penicillin concentration).
+        - Predicted values per model.
 
         Args:
+            project_name (str): The project identifier used to filter the data.
             batch_id (int | str): The batch identifier.
 
         Returns:
@@ -204,6 +204,16 @@ class InfluxDBServices:
         try:
             if not batch_id:
                 raise ValueError("The batch_id cannot be None or empty.")
+            
+            if not project_name or not isinstance(project_name, str):
+                raise ValueError("The project_name cannot be None or empty.")
+
+            # Normalize project_name
+            project_name = project_name.strip().lower()
+
+            # Basic sanitization to prevent Flux injection
+            #if not re.match(r"^[a-z0-9_\-]+$", project_name):
+            #    raise ValueError("The project_name contains invalid characters.")
 
             # Flux query
             raw_query = f"""
@@ -211,7 +221,7 @@ class InfluxDBServices:
                 |> range(start: 0)
                 |> filter(fn: (r) => r["batch_id"] == "{batch_id}")
                 |> filter(fn: (r) => r["_measurement"] == "{str(INFLUXDB_MEASUREMENT)}")
-                |> filter(fn: (r) => r["project_name"] == "{str(INFLUXDB_PROJECT_NAME)}")
+                |> filter(fn: (r) => r["project_name"] == "{project_name}")
                 |> filter(fn: (r) => r["device_id"] == "{str(INFLUXDB_DEVICE_ID)}")
                 |> rename(columns: {{_value: "raw_value"}})
                 |> keep(columns: ["_time", "observed_property", "raw_value"])
@@ -223,13 +233,13 @@ class InfluxDBServices:
                 |> range(start: 0)
                 |> filter(fn: (r) => r["batch_id"] == "{batch_id}")
                 |> filter(fn: (r) => r["_measurement"] == "{str(INFLUXDB_MEASUREMENT)}")
-                |> filter(fn: (r) => r["project_name"] == "{str(INFLUXDB_PROJECT_NAME)}")
+                |> filter(fn: (r) => r["project_name"] == "{project_name}")
                 |> filter(fn: (r) => r["device_id"] == "{str(INFLUXDB_DEVICE_ID)}")
                 |> rename(columns: {{_value: "prediction_value"}})
                 |> keep(columns: ["_time", "model_id", "prediction_value"])
                 |> pivot(rowKey:["_time"], columnKey: ["model_id"], valueColumn: "prediction_value")
                 """
-           
+            logger.debug(f"pred_query : {pred_query}")
             df_raw = self.connector.query_api.query_data_frame(raw_query)
             df_pred = self.connector.query_api.query_data_frame(pred_query)
             if df_raw.empty and df_pred.empty:
@@ -267,7 +277,8 @@ class InfluxDBServices:
         Returns:
             list: Unique list of experiment_ID.
         """
-        filter_project = f'|> filter(fn: (r) => r["project_name"] == "{project_name}")' if project_name else ""
+        logger.debug(f"project_name : {project_name}")
+        filter_project = f'|> filter(fn: (r) => r["project_name"] == "{project_name.lower()}")' if project_name else ""
 
         try:
             # Query to retrieve unique experiment_ID

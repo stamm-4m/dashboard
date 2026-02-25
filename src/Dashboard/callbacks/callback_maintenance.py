@@ -363,7 +363,7 @@ def update_graph_var_maintenance(data, data_exp, range_slider, n_clicks, selecte
         return go.Figure(), [], [], []
     
     # Load data from InfluxDB
-    dfc = influxdb_handler.get_data_until_latest(data_exp["selected_experiment"])
+    dfc = influxdb_handler.get_data_until_latest(data_exp["selected_project_name"], data_exp["selected_experiment"])
     dfc["_time"] = pd.to_datetime(dfc["_time"], errors="coerce")
 
     # Filter data by time range
