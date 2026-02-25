@@ -24,16 +24,23 @@ def save_to_store(project_value, experiment_value, store_data):
 
     store_data = store_data or {}
 
-    if project_value is not None:
-        store_data["selected_project"] = project_value
-        model_information = get_model_information(project_value)  # Cache the project information for faster access
-        data_info = model_information.project_details(project_value)
-        name = None
-        if data_info:
-            name = data_info.get('project_name',{})
-            store_data["selected_project_name"] = name
+    triggered_id = ctx.triggered_id
 
-    if experiment_value is not None:
+    # If project changed
+    if triggered_id == "project-dropdown" and project_value is not None:
+        store_data["selected_project"] = project_value
+
+        model_information = get_model_information(project_value)
+        data_info = model_information.project_details(project_value)
+
+        if data_info:
+            store_data["selected_project_name"] = data_info.get("project_name")
+
+        # Reset experiment when project changes
+        store_data["selected_experiment"] = None
+
+    # If experiment changed
+    if triggered_id == "experiment-dropdown" and experiment_value is not None:
         store_data["selected_experiment"] = experiment_value
 
     return store_data
@@ -48,9 +55,17 @@ def save_to_store(project_value, experiment_value, store_data):
 def update_dropdowns(pathname, selected_project, store_data):
     """Load experiment options ordered by most recent timestamp first."""
     try:
-        if not store_data or "selected_project_name" not in store_data:
-            return [[],None]
-        
+        #if not store_data or "selected_project_name" not in store_data:
+        if not selected_project:
+            return [[], None]
+
+        logger.debug(f"Selected project: {selected_project}")
+        model_information = get_model_information(selected_project)
+        data_info = model_information.project_details(selected_project)
+
+        if data_info:
+            store_data["selected_project_name"] = data_info.get("project_name")
+
         exp_all = influxdb_handler.get_distinct_experiment_ids(project_name=store_data["selected_project_name"])
         logger.debug(f"Experiments ID: {exp_all}")
 
@@ -91,7 +106,7 @@ def update_dropdowns(pathname, selected_project, store_data):
 
     except Exception as e:
         logger.error(f"Error updating dropdowns: {e}")
-        return [[]]
+        return [[],None]
 
 
 @dash.callback(
