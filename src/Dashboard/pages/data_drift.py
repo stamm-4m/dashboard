@@ -3,10 +3,10 @@ import dash_bootstrap_components as dbc
 
 from Dashboard.InfluxDb import influxdb_handler
 from Dashboard.utils.utils_data_drift import get_metrics_score_options
-from Dashboard.utils.utils_model_information import get_model_information
+from Dashboard.utils.utils_model_information import ModelInformation
 
 def data_drift_layout(store_data=None):
-        model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
+        model_information = ModelInformation(store_data.get("selected_project"))  # Cache the project information for faster access
         model_name_options = model_information.get_model_name_options()
         metrics_score_options = get_metrics_score_options()
     

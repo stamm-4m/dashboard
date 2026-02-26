@@ -2,7 +2,7 @@ import dash
 from dash import Input, Output, State, html, ctx, no_update
 import plotly.graph_objs as go
 from dash.exceptions import PreventUpdate
-from Dashboard.utils.utils_model_information import get_model_information,list_projects
+from Dashboard.utils.utils_model_information import ModelInformation,list_projects
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 from Dashboard.utils.utils_data_source import format_variable_name, generate_projects_details_view  # Load the necessary utility functions for the callbacks
 import plotly.express as px
@@ -26,8 +26,8 @@ def save_to_store(project_value, experiment_value, store_data):
 
     if project_value is not None:
         store_data["selected_project"] = project_value
-        model_information = get_model_information(project_value)  # Cache the project information for faster access
-        data_info = model_information.project_details(project_value)
+        model_information = ModelInformation(project_value)  # Cache the project information for faster access
+        data_info = model_information.project_details()
         name = None
         if data_info:
             name = data_info.get('project_name',{})
@@ -52,8 +52,8 @@ def update_dropdowns(pathname, selected_project, store_data):
             return [[],None]
         
         logger.debug(f"Selected project: {selected_project}")
-        model_information = get_model_information(selected_project)
-        data_info = model_information.project_details(selected_project)
+        model_information = ModelInformation(selected_project)
+        data_info = model_information.project_details()
 
         if data_info:
             store_data["selected_project_name"] = data_info.get("project_name")
@@ -200,8 +200,8 @@ def display_project_details(value):
     if not value:
         return html.P("No project selected"), "Project name: N/A"
     
-    model_information = get_model_information(value)  # Cache the project information for faster access
-    data_info = model_information.project_details(value)
+    model_information = ModelInformation(value)  # Cache the project information for faster access
+    data_info = model_information.project_details()
 
     if data_info:
         name = f"Project name: {data_info.get('project_name',{})}"

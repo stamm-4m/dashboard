@@ -13,7 +13,7 @@ from Dashboard.utils import sqlite_handler
 import plotly.express as px
 from Dashboard.config import DB_ENGINE, BASE_URL_API, INFLUXDB_BUCKET_RAW
 import logging
-from Dashboard.utils.utils_model_information import get_model_information
+from Dashboard.utils.utils_model_information import ModelInformation
 
 logger = logging.getLogger(__name__) 
 
@@ -63,17 +63,14 @@ def update_model_options(n_clicks, store_data):
     Returns:
         list: A list of dictionaries representing model options for the selector.
     """
-    # Reload all available models
-    reload_models(store_data.get("selected_project"))  # Pass the project
-    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
-    # Retrieve and return updated model names for the dropdown options
-    return model_information.get_model_name_options()
+    
+    project_id = store_data.get("selected_project")
 
-# Calls the function again to read  'Models
-def reload_models(project_id):
-    model_information = get_model_information(project_id)
-    model_information.configurations = []
-    model_information.load_all_models()
+    model_information = ModelInformation(project_id)
+    options = model_information.get_model_name_options()
+
+    return options
+
 
 # Show selected experiment ID
 @dash.callback(
@@ -156,7 +153,7 @@ def update_model_types_maintenance(name, store_data):
         no types are found for the given model.
     """
     # Retrieve unique model types based on the selected model name
-    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
+    model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
     types_variable = model_information.get_unique_types_models(name)
     
     # Log a debug message and return an empty list if no types are found
@@ -192,8 +189,8 @@ def update_name_selector(selected_category, model_name, store_data):
     """
     if selected_category:
         # Retrieve names that correspond to the selected category and model
-        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
-        logger.debug(f"name_variable: {model_information.get_names_by_category(selected_category, model_name)}")
+        model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
+        #logger.debug(f"name_variable: {model_information.get_names_by_category(selected_category, model_name)}")
         return model_information.get_names_by_category(selected_category, model_name)
     else:
         # Return an empty list if no category is selected

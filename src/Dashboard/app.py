@@ -5,14 +5,8 @@ import dash_bootstrap_components as dbc
 import flask
 
 # Configuration loggin
-root_logger = logging.getLogger()
-for handler in root_logger.handlers[:]:
-    root_logger.removeHandler(handler)
-root_logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s [func:%(funcName)s]")
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(formatter)
-root_logger.addHandler(console_handler)
+from Dashboard.utils.logging_config import setup_logging
+setup_logging(level="DEBUG", log_file="dashboard.log")
 
 # Create the Flask server
 server = flask.Flask(__name__)

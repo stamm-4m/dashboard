@@ -2,7 +2,7 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc
 from Dashboard.drift_detectors_pack.drift_detectors.drift_detector import get_metadata
 from Dashboard.utils.utils_help import build_drift_detector_help, build_models_help, build_navigation
-from Dashboard.utils.utils_model_information import get_model_information
+from Dashboard.utils.utils_model_information import ModelInformation
 
 
 
@@ -13,7 +13,7 @@ def help_layout(store_data=None):
     metadata = {}
 
     if not store_data:
-        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
+        model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
         metadata = {
         "Models": model_information.project_details("P0001"),
         "Drift Detectors": get_metadata(),

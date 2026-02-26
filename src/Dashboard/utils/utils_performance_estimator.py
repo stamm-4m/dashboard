@@ -5,7 +5,6 @@ import numpy as np
 from typing import Union, Callable
 import yaml
 import logging
-from Dashboard.utils.utils_model_information import get_model_information
 
 
 metric_load = []
@@ -31,11 +30,6 @@ def get_next_color():
     color_index += 1  # Advances the index for the next line
     return color
 
-# Calls the function again to read  'Models
-def reload_models(project_id):
-    model_information = get_model_information(project_id)  # Get the updated model information
-    model_information.configurations = []
-    model_information.load_all_models()
 
 def calculate_mae(y_true, y_pred):
     """

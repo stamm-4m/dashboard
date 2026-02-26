@@ -1,11 +1,12 @@
 import dash
 from dash import Input, Output, State, html, ALL, ctx
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
-from Dashboard.utils.utils_model_information import get_model_information
+from Dashboard.utils.utils_model_information import ModelInformation
 from Dashboard.utils.utils_softsensors import (create_toast,build_figure_with_traces,update_xaxis_range,
-                                                    get_latest_index,build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels,reload_models)
+                                                    build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels)
 from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
@@ -117,7 +118,7 @@ def update_name_selector(selected_category,model_name, data_store):
                 list: A list of dictionaries with the options for the 'name-selector' dropdown.
             """
             if selected_category:
-                model_information = get_model_information(data_store.get("selected_project"))  # Get the updated model information
+                model_information = ModelInformation(data_store.get("selected_project"))  # Get the updated model information
                 # Get names corresponding to the selected category
                 return model_information.get_names_by_category(selected_category,model_name)
             else:
@@ -132,17 +133,26 @@ def update_name_selector(selected_category,model_name, data_store):
     State("store-selected-state", "data")
 )
 def update_model_options(data_store, store_data):
-    reload_models(project_id=store_data.get("selected_project"))
-    logger.debug(f"store_data : {store_data}")
-    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
-    options = model_information.get_model_name_options()
 
+    if not store_data:
+        raise PreventUpdate
+
+    project_id = store_data.get("selected_project")
+
+    if not project_id:
+        raise PreventUpdate
+
+    model_information = ModelInformation(project_id)
+    options = model_information.get_model_name_options()
+    
     selected_value = None
-    if data_store and "selected_model" in data_store:
-        selected_value = data_store["selected_model"]
+    if data_store:
+        selected_value = data_store.get("selected_model")
+
+    if selected_value not in [opt["value"] for opt in options]:
+        selected_value = None
 
     return options, selected_value
-
         
         # Function to update the ypes  of model inputs
 @dash.callback(
@@ -154,7 +164,7 @@ def update_model_options(data_store, store_data):
 def update_model_types(name, store_data):
             logger.debug(f"Updating type options for model: {name}")
             logger.debug(f"Store data in update_model_types: {store_data}")
-            model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
+            model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
             types_variable = model_information.get_unique_types_models(name)
             return types_variable 
 
@@ -169,8 +179,8 @@ def display_model_details(selected_model, store_data):
     if not selected_model:
         return html.P("Select a model to show configuration.", style={'textAlign': 'center'}), {}
 
-    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
-    config = model_information.get_configuration_by_model_name_language(selected_model)
+    model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
+    config = model_information.get_configuration_by_model_id(selected_model)
 
     if config:
         model_data = {

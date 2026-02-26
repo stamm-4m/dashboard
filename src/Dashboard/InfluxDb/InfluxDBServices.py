@@ -126,7 +126,6 @@ class InfluxDBServices:
         Returns:
             pd.DataFrame: DataFrame with the data corresponding to the batch_id.
         """
-        logger.debug(f"batch_id : {batch_id}")
         try:
             # Validate batch_id
             if not batch_id:
@@ -143,8 +142,6 @@ class InfluxDBServices:
             |> range(start: {str(start_flux)})  // Adjust the time range as needed
             |> filter(fn: (r) => r["{str(INFLUXDB_BATCH_ID)}"] == "{str(batch_id)}")
             """
-
-            logger.debug(f"query {query}")
 
             # Execute the query
             results = self.connector.query_api.query(query=query)

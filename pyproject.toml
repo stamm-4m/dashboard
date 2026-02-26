@@ -30,6 +30,7 @@ multi-db-connector = { path = "src/Dashboard/db_connector", develop = true }
 openpyxl = "^3.1.5"
 dash-html-components = "^2.0.0"
 humanize = "^4.14.0"
+colorlog = "^6.10.1"
 
 
 [tool.poetry.scripts]

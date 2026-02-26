@@ -9,9 +9,8 @@ import pandas as pd
 import scipy.stats as stats
 import logging
 import json
-from Dashboard.utils.utils_model_information import get_model_information
+from Dashboard.utils.utils_model_information import ModelInformation
 from Dashboard.utils.utils_data_drift import get_result_metric,get_detector_description
-from Dashboard.utils.utils_sofsensors_offline import reload_models
 from Dashboard.InfluxDb import influxdb_handler  # Retrieve the created instance
 
 logger = logging.getLogger(__name__)
@@ -25,9 +24,11 @@ UNIVARIABLE_METRICS = ["ADWIN","KS","PSI"]
     State("store-selected-state", "data"),
 )
 def reload_model_options(n_clicks, store_data):
-    reload_models(store_data.get("selected_project"))  # Pass the project ID to reload models
-    model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
-    return model_information.get_model_name_options()
+    project_id = store_data.get("selected_project")
+
+    model_information = ModelInformation(project_id)
+    options = model_information.get_model_name_options()
+    return options
 
 # Load selected metrics
 @dash.callback(
@@ -45,7 +46,7 @@ def update_metrics_section(selected_metric, selected_model, store_data):
     
     model_options = [] # If no model is selected, leave it empty
     if selected_model:
-        model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
+        model_information = ModelInformation(store_data.get("selected_project"))  # Cache the project information for faster access
         model_options = model_information.load_inputs_from_configuration(selected_model)
     variable_show = {"display":"none"}
     graph_show = {"display":"none"}
@@ -166,9 +167,9 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
         return dash.no_update
 
     # 1. Retrieve data from the selected model's YAML
-    model_information = get_model_information(store_data.get("selected_project"))  # Cache the project information for faster access
+    model_information = ModelInformation(store_data.get("selected_project"))  # Cache the project information for faster access
     config = model_information.get_configuration_by_model_name(soft_sensor)  # Implement this function
-    training_info = config["training_information"]
+    training_info = config.get("ml_model_configuration", {}).get("training_information", {})
 
     # 2. Extract values from experiments_id
     experiments_id = training_info.get("experiments_ID", {})

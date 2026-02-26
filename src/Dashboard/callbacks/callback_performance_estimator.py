@@ -6,8 +6,8 @@ import plotly.graph_objs as go
 import pandas as pd
 import logging
 from Dashboard.InfluxDb import influxdb_handler
-from Dashboard.utils.utils_model_information import get_model_information
-from Dashboard.utils.utils_performance_estimator import get_next_color,reload_models,load_estimator_descriptions,compute_metric,reorder_dataframe_for_table
+from Dashboard.utils.utils_model_information import ModelInformation
+from Dashboard.utils.utils_performance_estimator import get_next_color,load_estimator_descriptions,compute_metric,reorder_dataframe_for_table
 from Dashboard.utils.utils_global import disabled_figure
 
 logger = logging.getLogger(__name__) 
@@ -20,9 +20,11 @@ logger = logging.getLogger(__name__)
         )
 def update_model_options(n_clicks, store_data ):
     logger.debug(f"update_model_options called with store_data: {store_data}")
-    reload_models(project_id=store_data.get("selected_project"))  # Reload models to get the latest information
-    model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
-    return model_information.get_model_id_options()
+    project_id = store_data.get("selected_project")
+
+    model_information = ModelInformation(project_id)
+    options = model_information.get_model_name_options()
+    return options
 
 @dash.callback(
             Output("performance-plot", "figure", allow_duplicate=True),
@@ -68,7 +70,7 @@ def update_experiment_display(data):
 def update_input_options(selected_model, store_data):
     
     if selected_model:
-        model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
+        model_information = ModelInformation(store_data.get("selected_project"))  # Get the updated model information
         return model_information.load_inputs_from_configuration(selected_model)
     return []  # If no model is selected, leave it empty
 
