@@ -4,9 +4,8 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 from Dashboard.InfluxDb import influxdb_handler # retrieve the created instance
 from Dashboard.utils.utils_model_information import get_model_information
-from Dashboard.utils.utils_sofsensors_offline import reload_models
 from Dashboard.utils.utils_softsensors import (create_toast,build_figure_with_traces,update_xaxis_range,
-                                                    get_latest_index,build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels)
+                                                    get_latest_index,build_figure_from_data,init_data_prediction,append_prediction,update_axes_labels,reload_models)
 from Dashboard.pages.model_details_view import generate_model_details_view
 import pandas as pd
 import plotly.express as px
@@ -134,6 +133,7 @@ def update_name_selector(selected_category,model_name, data_store):
 )
 def update_model_options(data_store, store_data):
     reload_models(project_id=store_data.get("selected_project"))
+    logger.debug(f"store_data : {store_data}")
     model_information = get_model_information(store_data.get("selected_project"))  # Get the updated model information
     options = model_information.get_model_name_options()
 

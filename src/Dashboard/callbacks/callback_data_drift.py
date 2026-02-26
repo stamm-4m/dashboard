@@ -194,27 +194,11 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
         training_data = test_data + noise
     # --------------------------------------------------------- 
 
-    fig = go.Figure()
+    
     fig2 = go.Figure()
 
     if band_univariable:
-        # Histogramas
-        fig.add_trace(go.Histogram(
-            x=training_data, histnorm='probability density', name='Training Set',
-            opacity=0.5, marker=dict(color='blue')
-        ))
-        fig.add_trace(go.Histogram(
-            x=test_data, histnorm='probability density', name='Test Set',
-            opacity=0.5, marker=dict(color='red')
-        ))
-        fig.update_layout(
-            title=f"Density of training set and Experiment ID {experiment_id} - Variable ({selected_input})",
-            xaxis_title=selected_input,
-            yaxis_title="Density",
-            barmode="overlay",
-            template="plotly_white"
-        )
-
+        
         # === KDE o manejo de datos constantes ===
         def safe_kde(data, color, name):
             if np.var(data) < 1e-6:  # casi constante
@@ -228,9 +212,11 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
                 x_vals = np.linspace(min(data), max(data), 100)
                 y_vals = kde(x_vals)
                 return x_vals, y_vals
-
+        
+        
         # Training KDE
         train_x, train_y = safe_kde(training_data, "blue", "Training Set")
+        #logger.debug(f"training data train_x, train_y: {train_x}, {train_y}")
         fig2.add_trace(go.Scatter(
             x=train_x, y=train_y, mode='lines', name='Training Set',
             fill='tozeroy', line=dict(color='blue', width=2), opacity=0.5
@@ -238,6 +224,7 @@ def update_density_plot(n_clicks, soft_sensor, experiment_id, selected_input, me
 
         # Test KDE
         test_x, test_y = safe_kde(test_data, "red", f"Experiment ID: {experiment_id}")
+        #logger.debug(f"test_data data test_x, test_y: {test_x}, {test_y}")
         fig2.add_trace(go.Scatter(
             x=test_x, y=test_y, mode='lines', name=f"Experiment ID: {experiment_id}",
             fill='tozeroy', line=dict(color='red', width=2), opacity=0.5

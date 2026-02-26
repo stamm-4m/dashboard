@@ -8,11 +8,18 @@ import plotly.express as px
 import numpy as np
 import logging
 import pandas as pd
+from Dashboard.utils.utils_model_information import get_model_information  # Retrieve the created instance
+
 
 logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
+
+def reload_models(project_id): 
+    model_information = get_model_information(project_id)
+    model_information.configurations = []
+    model_information.load_all_models()
 
 def get_latest_index(experiment_id: str) -> int:
     """
